@@ -193,8 +193,8 @@ export default {
     'asm.what.base': 'base register',
 
     'ui.docTitle': 'RISC-V Superscalar Simulator',
-    'ui.appTitle': 'Superscalar<br />Simulator',
-    'ui.new': 'New Simulation',
+    'ui.appTitle': 'Superscalar Simulator <b>RISC-V</b>',
+    'ui.new': 'New simulation',
     'ui.edit': 'Edit',
     'ui.compare': 'Compare',
     'ui.compareHelp': 'Runs the same program with another configuration and shows the results side by side',
@@ -211,6 +211,8 @@ export default {
     'ui.linkCopied': 'Link copied',
     'ui.copyThisLink': 'Copy the link:',
     'ui.language': 'Language',
+    'ui.theme': 'Toggle contrast (light or dark)',
+    'ui.close': 'Close',
     'ui.help': 'Help',
     'ui.shared': 'Shared simulation',
     'ui.ctl.start': 'Go to start (Home)',
@@ -368,7 +370,7 @@ export default {
     'stats.cacheHits': 'Cache hits',
     'stats.cacheMisses': 'Cache misses',
 
-    'ed.title.new': 'New Simulation',
+    'ed.title.new': 'New simulation',
     'ed.title.edit': 'Edit simulation',
     'ed.title.compare': 'Compare: choose configuration B',
     'ed.run': 'Run',

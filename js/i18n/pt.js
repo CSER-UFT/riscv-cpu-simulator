@@ -201,8 +201,8 @@ export default {
 
     // Interface ---------------------------------------------------------------------------------------------
     'ui.docTitle': 'Simulador Superescalar RISC-V',
-    'ui.appTitle': 'Simulador<br />Superescalar',
-    'ui.new': 'Nova Simulação',
+    'ui.appTitle': 'Simulador Superescalar <b>RISC-V</b>',
+    'ui.new': 'Nova simulação',
     'ui.edit': 'Editar',
     'ui.compare': 'Comparar',
     'ui.compareHelp': 'Executa o mesmo programa com outra configuração e mostra os resultados lado a lado',
@@ -219,6 +219,8 @@ export default {
     'ui.linkCopied': 'Link copiado',
     'ui.copyThisLink': 'Copie o link:',
     'ui.language': 'Idioma',
+    'ui.theme': 'Alternar contraste (claro ou escuro)',
+    'ui.close': 'Fechar',
     'ui.help': 'Ajuda',
     'ui.shared': 'Simulação compartilhada',
     'ui.ctl.start': 'Ir para o início (Home)',
@@ -379,7 +381,7 @@ export default {
     'stats.cacheMisses': 'Falhas na cache',
 
     // Editor ------------------------------------------------------------------------------------------------
-    'ed.title.new': 'Nova Simulação',
+    'ed.title.new': 'Nova simulação',
     'ed.title.edit': 'Editar simulação',
     'ed.title.compare': 'Comparar: escolha a configuração B',
     'ed.run': 'Executar',

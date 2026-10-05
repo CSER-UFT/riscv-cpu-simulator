@@ -210,7 +210,7 @@ export class Editor {
             </fieldset>
             <fieldset class="tom-only"><legend>${t('ed.stations')}</legend>
                 <table class="groups"><tr><th>${t('ed.group')}</th><th>${t('ed.count')}</th><th>${t('ed.units')}</th><th>${t('ed.classes')}</th><th></th></tr>${groups}</table>
-                <span class="button small" data-action="add-group">${t('ed.addGroup')}</span>
+                <button type="button" class="btn small" data-action="add-group">${t('ed.addGroup')}</button>
                 <p class="note">${t('ed.unitsHelp')}</p>
             </fieldset>
             <fieldset class="not-single"><legend>${t('ed.latencies')}</legend><div class="latencies">${lat}</div></fieldset>
@@ -249,7 +249,7 @@ export class Editor {
             <td class="units"><input type="number" name="g-units" value="${g.units ?? 0}" min="0" max="16" title="${esc(t('ed.unitsHelp'))}" />
                 <label title="${esc(t('ed.pipelinedHelp'))}"><input type="checkbox" name="g-pipelined" ${g.pipelined !== false ? 'checked' : ''} />${t('ed.pipelined')}</label></td>
             <td class="classes">${checks}</td>
-            <td><span class="button small" data-action="remove" title="${esc(t('ed.removeGroup'))}">${t('ed.remove')}</span></td></tr>`;
+            <td><button type="button" class="btn small" data-action="remove" title="${esc(t('ed.removeGroup'))}">${t('ed.remove')}</button></td></tr>`;
     }
 
     bindGroupRows() {

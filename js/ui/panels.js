@@ -6,8 +6,11 @@ import * as regs from '../riscv/registers.js';
 import { words } from '../riscv/memory.js';
 import { t } from '../i18n/index.js';
 
-export const COLORS = ['#8b7cdc', '#3fa83c', '#e5534b', '#3a87b8', '#9cb22e', '#c46fc6', '#2fb3a9', '#e3a01b', '#7a8ba8', '#d9762b'];
-export const SOFT = ['#dcd7f4', '#cfeccd', '#f6d0ce', '#cfe3f0', '#e6edc8', '#f0d6f0', '#c9ece9', '#f7e6c2', '#dde2ea', '#f6dcc7'];
+/**
+ * Cores das etiquetas (estações, entradas do ROB, instruções no pipeline). A interface mistura cada cor com
+ * o fundo do tema (claro ou escuro) via CSS, a partir da variável --tag.
+ */
+export const COLORS = ['#5b6ee1', '#2f9e6e', '#d1495b', '#1f8fb3', '#b38a00', '#9a5bc4', '#14a39a', '#d9792b', '#6b7a99', '#c2558f'];
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c]);
 
@@ -25,16 +28,16 @@ export function createContext(sim) {
     return { sim, stationIndex, registers: [...used].sort(regs.compare), dataLabels };
 }
 
-export function tagColor(ctx, tag, soft = false) {
+export function tagColor(ctx, tag) {
     let i;
     if (typeof tag === 'string' && tag.startsWith('#')) i = (parseInt(tag.slice(1)) - 1) % COLORS.length;
     else i = (ctx.stationIndex.get(tag) ?? 0) % COLORS.length;
-    return soft ? SOFT[i] : COLORS[i];
+    return COLORS[i];
 }
 
 export function tagCell(ctx, tag) {
     if (tag === null || tag === undefined) return '<td></td>';
-    return `<td class="tag" style="background:${tagColor(ctx, tag, true)};color:${tagColor(ctx, tag)}">${esc(tag)}</td>`;
+    return `<td class="tag" style="--tag:${tagColor(ctx, tag)}">${esc(tag)}</td>`;
 }
 
 /** Banco de registradores; `status` (opcional) é a tabela Qi do Tomasulo. */

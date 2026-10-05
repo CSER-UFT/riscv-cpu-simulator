@@ -27,6 +27,26 @@ const buttons = {
     link: document.getElementById('copy-link'),
 };
 
+// Tema claro ou escuro ------------------------------------------------------------------------------------
+
+const themeButton = document.getElementById('theme-toggle');
+function updateThemeIcon() {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    themeButton.querySelector('.icon').className = `icon ${dark ? 'i-sun' : 'i-moon'}`;
+    themeButton.setAttribute('aria-pressed', String(dark));
+}
+themeButton.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try {
+        localStorage.setItem('tomasulo.theme', next);
+    } catch {
+        // sem armazenamento: o tema vale só nesta visita
+    }
+    updateThemeIcon();
+});
+updateThemeIcon();
+
 // Idioma -------------------------------------------------------------------------------------------------
 
 const langSelect = document.getElementById('lang-select');
@@ -152,7 +172,16 @@ for (const item of buttons.export.querySelectorAll('[data-export]')) {
         }
     });
 }
-buttons.export.addEventListener('click', () => buttons.export.classList.toggle('open'));
+buttons.export.addEventListener('click', () => {
+    const open = buttons.export.classList.toggle('open');
+    if (open) {
+        // O menu usa posição fixa para não ser cortado pela barra de ações, que tem rolagem horizontal.
+        const r = buttons.export.getBoundingClientRect();
+        const items = buttons.export.querySelector('.menu-items');
+        items.style.top = `${r.bottom}px`;
+        items.style.left = `${r.left}px`;
+    }
+});
 document.addEventListener('click', (e) => { if (!buttons.export.contains(e.target)) buttons.export.classList.remove('open'); });
 
 buttons.link.addEventListener('click', async () => {

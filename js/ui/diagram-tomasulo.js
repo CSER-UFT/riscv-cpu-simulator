@@ -53,14 +53,14 @@ function renderGroup(ctx, snap, group, focus, rob) {
     const head = `<tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr>`;
     const val = (st, side) => (st[`${side}Used`] && st[`Q${side}`] === null ? esc(fmt.value(st[`V${side}`])) : '');
     const rows = stations.map((st) => {
-        const name = `<th style="color:${tagColor(ctx, st.name)}">${esc(st.name)}</th>`;
+        const name = `<th class="tagname" style="--tag:${tagColor(ctx, st.name)}">${esc(st.name)}</th>`;
         const cls = focus.has(`st:${st.name}`) ? 'focus' : '';
         if (!st.busy)
             return `<tr class="${cls}">${name}<td>${t('ui.no')}</td>${'<td></td>'.repeat(cols.length - 3)}<td></td></tr>`;
         const inst = ctx.sim.program.instructions[ctx.sim.dyn[st.dyn].index];
         const vk = st.kImm ? `<span class="imm">${esc(fmt.value(st.Vk))}</span>` : val(st, 'k');
         const a = st.addr !== null ? fmt.address(st.addr) : (st.cls === 'load' || st.cls === 'store' ? `${st.imm}` : '');
-        return `<tr class="busy ${cls}" style="--row:${tagColor(ctx, st.name, true)}">${name}
+        return `<tr class="busy ${cls}" style="--tag:${tagColor(ctx, st.name)}">${name}
             <td>${t('ui.yes')}</td><td><code>${esc(inst.text)}</code></td>
             <td class="num">${val(st, 'j')}</td><td class="num">${vk}</td>${hasM ? `<td class="num">${val(st, 'm')}</td>` : ''}
             ${tagCell(ctx, st.Qj)}${tagCell(ctx, st.Qk)}${hasM ? tagCell(ctx, st.Qm) : ''}
@@ -82,7 +82,7 @@ function renderGroup(ctx, snap, group, focus, rob) {
 function renderCdb(ctx, snap, focus) {
     const items = snap.cdb.length === 0
         ? `<span class="sub">${t('ui.free')}</span>`
-        : snap.cdb.map((c) => `<span class="cdb-item" style="background:${tagColor(ctx, c.tag, true)};color:${tagColor(ctx, c.tag)}">${esc(c.tag)} = ${esc(fmt.value(c.value))}</span>`).join(' ');
+        : snap.cdb.map((c) => `<span class="cdb-item" style="--tag:${tagColor(ctx, c.tag)}">${esc(c.tag)} = ${esc(fmt.value(c.value))}</span>`).join(' ');
     return `<section class="panel cdb ${snap.cdb.length > 0 ? 'active' : ''} ${focus.has('cdb') ? 'focus' : ''}" data-part="cdb">
         <h3>Common Data Bus</h3><div>${items}</div></section>`;
 }
@@ -99,7 +99,7 @@ function renderRob(ctx, snap, focus) {
         const tag = `#${i + 1}`;
         const cls = `${focus.has(`rob:${i}`) ? 'focus' : ''} ${e ? 'busy' : ''}`;
         if (!e) {
-            rows.push(`<tr class="${cls}"><th style="color:${tagColor(ctx, tag)}">${tag}</th><td>${t('ui.no')}</td><td></td><td></td><td></td><td></td><td>${marker}</td></tr>`);
+            rows.push(`<tr class="${cls}"><th class="tagname" style="--tag:${tagColor(ctx, tag)}">${tag}</th><td>${t('ui.no')}</td><td></td><td></td><td></td><td></td><td>${marker}</td></tr>`);
             continue;
         }
         const d = ctx.sim.dyn[e.dyn];
@@ -115,8 +115,8 @@ function renderRob(ctx, snap, focus) {
             dest = t('ui.rob.predicted', { dir: t(e.predicted ? 'common.taken' : 'common.notTaken') });
             value = e.ready ? `${t(e.taken ? 'common.taken' : 'common.notTaken')}${e.mispredict ? ` (${t('ui.rob.wrong')})` : ''}` : '';
         }
-        rows.push(`<tr class="${cls} ${e.mispredict ? 'mispredict' : ''}" style="--row:${tagColor(ctx, tag, true)}">
-            <th style="color:${tagColor(ctx, tag)}">${tag}</th><td>${t('ui.yes')}</td><td><code>${esc(inst.text)}</code></td>
+        rows.push(`<tr class="${cls} ${e.mispredict ? 'mispredict' : ''}" style="--tag:${tagColor(ctx, tag)}">
+            <th class="tagname" style="--tag:${tagColor(ctx, tag)}">${tag}</th><td>${t('ui.yes')}</td><td><code>${esc(inst.text)}</code></td>
             <td>${esc(state)}</td><td>${esc(dest)}</td><td class="num">${esc(value)}</td><td>${marker}</td></tr>`);
     }
     return `<section class="panel ${focus.has('rob') ? 'focus' : ''}" data-part="rob">

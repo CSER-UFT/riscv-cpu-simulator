@@ -5,32 +5,45 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Simulador Superescalar RISC-V</title>
         <link rel="icon" href="./svg/cpu.svg" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
         <link rel="stylesheet" type="text/css" href="./css/index.css" />
+        <script>
+            // Aplica o tema antes da primeira pintura, para não piscar.
+            try {
+                const theme = localStorage.getItem('tomasulo.theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.dataset.theme = theme;
+            } catch { document.documentElement.dataset.theme = 'light'; }
+        </script>
     </head>
     <body>
         <div id="workspace" class="screen">
-            <div id="header">
-                <img class="logo" src="./svg/cpu.svg" alt="" />
-                <div class="title" data-i18n-html="ui.appTitle">Simulador<br />Superescalar</div>
-                <div id="open-novo" class="button"><img src="./svg/new.svg" alt="" /><span data-i18n="ui.new">Nova Simulação</span></div>
-                <div id="open-editar" class="button hidden" data-i18n="ui.edit">Editar</div>
-                <div id="open-comparar" class="button hidden" data-i18n="ui.compare" data-i18n-title="ui.compareHelp">Comparar</div>
-                <div id="open-exercicio" class="button hidden" data-i18n="ui.exercise" data-i18n-title="ui.exerciseHelp">Exercício</div>
-                <div id="export-menu" class="button menu hidden">
-                    <span data-i18n="ui.export">Exportar</span>
-                    <div class="menu-items">
-                        <div data-export="timeline-csv" data-i18n="ui.exp.timelineCsv">Linha do tempo (CSV)</div>
-                        <div data-export="timeline-tex" data-i18n="ui.exp.timelineTex">Linha do tempo (LaTeX)</div>
-                        <div data-export="events-csv" data-i18n="ui.exp.eventsCsv">Tabela de eventos (CSV)</div>
-                        <div data-export="events-tex" data-i18n="ui.exp.eventsTex">Tabela de eventos (LaTeX)</div>
-                        <div data-export="events-blank" data-i18n="ui.exp.eventsBlank">Tabela de eventos em branco (LaTeX)</div>
+            <header id="header">
+                <div class="brand"><span class="icon i-cpu brand-mark" aria-hidden="true"></span><span class="brand-name" data-i18n-html="ui.appTitle">Simulador Superescalar <b>RISC-V</b></span></div>
+                <nav class="actions">
+                    <button type="button" id="open-novo" class="btn primary"><span class="icon i-new" aria-hidden="true"></span><span data-i18n="ui.new">Nova simulação</span></button>
+                    <button type="button" id="open-editar" class="btn hidden" data-i18n="ui.edit">Editar</button>
+                    <button type="button" id="open-comparar" class="btn hidden" data-i18n="ui.compare" data-i18n-title="ui.compareHelp">Comparar</button>
+                    <button type="button" id="open-exercicio" class="btn hidden" data-i18n="ui.exercise" data-i18n-title="ui.exerciseHelp">Exercício</button>
+                    <div id="export-menu" class="menu hidden">
+                        <button type="button" class="btn" data-i18n="ui.export">Exportar</button>
+                        <div class="menu-items">
+                            <button type="button" data-export="timeline-csv" data-i18n="ui.exp.timelineCsv">Linha do tempo (CSV)</button>
+                            <button type="button" data-export="timeline-tex" data-i18n="ui.exp.timelineTex">Linha do tempo (LaTeX)</button>
+                            <button type="button" data-export="events-csv" data-i18n="ui.exp.eventsCsv">Tabela de eventos (CSV)</button>
+                            <button type="button" data-export="events-tex" data-i18n="ui.exp.eventsTex">Tabela de eventos (LaTeX)</button>
+                            <button type="button" data-export="events-blank" data-i18n="ui.exp.eventsBlank">Tabela de eventos em branco (LaTeX)</button>
+                        </div>
                     </div>
+                    <button type="button" id="copy-link" class="btn hidden" data-i18n="ui.copyLink" data-i18n-title="ui.copyLinkHelp">Copiar link</button>
+                </nav>
+                <div class="tools">
+                    <label class="lang"><span class="sr-only" data-i18n="ui.language">Idioma</span><select id="lang-select"></select></label>
+                    <button type="button" id="theme-toggle" class="btn icon-btn" data-i18n-title="ui.theme"><span class="icon i-moon" aria-hidden="true"></span><span class="sr-only" data-i18n="ui.theme">Alternar contraste</span></button>
+                    <button type="button" id="open-ajuda" class="btn" data-i18n="ui.help">Ajuda</button>
                 </div>
-                <div id="copy-link" class="button hidden" data-i18n="ui.copyLink" data-i18n-title="ui.copyLinkHelp">Copiar link</div>
-                <div class="spacer"></div>
-                <label class="lang"><span class="sr-only" data-i18n="ui.language">Idioma</span><select id="lang-select"></select></label>
-                <div id="open-ajuda" class="button" data-i18n="ui.help">Ajuda</div>
-            </div>
+            </header>
             <div id="tab-names"><div id="tab-filler">&nbsp;</div></div>
             <div id="tab-visual">
                 <div id="readme">
@@ -110,12 +123,14 @@
                 </div>
                 <div id="sheet" class="hidden"></div>
                 <div id="control">
-                    <div id="control-skip-back" class="control-button control-div active" data-i18n-title="ui.ctl.start"><img src="./svg/skipBack.svg" alt="" /></div>
-                    <div id="control-step-back" class="control-button control-div active" data-i18n-title="ui.ctl.back"><img src="./svg/stepBack.svg" alt="" /></div>
-                    <div id="control-counter" class="control-div"></div>
-                    <div id="control-step-fwd" class="control-button control-div active" data-i18n-title="ui.ctl.fwd"><img src="./svg/stepFwd.svg" alt="" /></div>
-                    <div id="control-skip-fwd" class="control-button control-div active" data-i18n-title="ui.ctl.end"><img src="./svg/skipFwd.svg" alt="" /></div>
-                    <div id="control-msg"></div>
+                    <div class="ctl-buttons">
+                        <button type="button" id="control-skip-back" class="control-button active" data-i18n-title="ui.ctl.start"><span class="icon i-skip-back" aria-hidden="true"></span></button>
+                        <button type="button" id="control-step-back" class="control-button active" data-i18n-title="ui.ctl.back"><span class="icon i-step-back" aria-hidden="true"></span></button>
+                        <div id="control-counter"></div>
+                        <button type="button" id="control-step-fwd" class="control-button active" data-i18n-title="ui.ctl.fwd"><span class="icon i-step-fwd" aria-hidden="true"></span></button>
+                        <button type="button" id="control-skip-fwd" class="control-button active" data-i18n-title="ui.ctl.end"><span class="icon i-skip-fwd" aria-hidden="true"></span></button>
+                    </div>
+                    <div id="control-msg" aria-live="polite"></div>
                 </div>
             </div>
             <div id="tab-timeline">
@@ -125,7 +140,7 @@
 
         <div id="md-novo" class="modal screen">
             <div class="dialog wide">
-                <img id="close-novo" class="close button" src="./svg/close.svg" alt="X" />
+                <button type="button" id="close-novo" class="close icon-btn btn" data-i18n-title="ui.close"><span class="icon i-close" aria-hidden="true"></span></button>
                 <h1>Nova Simulação</h1>
                 <div class="editor-layout">
                     <div class="editor-code">
@@ -144,8 +159,8 @@
                     <div class="editor-config" id="novo-config"></div>
                 </div>
                 <div class="dialog-actions">
-                    <span id="novo-reset" class="button" data-i18n="ed.reset">Restaurar configuração padrão</span>
-                    <span id="novo-submit" class="button primary">Executar</span>
+                    <button type="button" id="novo-reset" class="btn" data-i18n="ed.reset">Restaurar configuração padrão</button>
+                    <button type="button" id="novo-submit" class="btn primary">Executar</button>
                 </div>
             </div>
         </div>

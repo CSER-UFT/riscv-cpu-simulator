@@ -32,11 +32,11 @@ export function renderExercise(el, sim, code, state) {
             <section class="panel">
                 <table class="exercise"><tr><th>${t('ui.instruction')}</th>${cols.map((c) => `<th>${esc(c.label)}</th>`).join('')}</tr>${body}</table>
                 <div class="ex-actions">
-                    <span class="button primary" data-act="check">${t('ex.check')}</span>
-                    <span class="button" data-act="reveal">${t('ex.reveal')}</span>
-                    <span class="button" data-act="clear">${t('ex.clear')}</span>
-                    <span class="button" data-act="blank">${t('ex.exportBlank')}</span>
-                    <span class="button" data-act="key">${t('ex.exportKey')}</span>
+                    <button type="button" class="btn primary" data-act="check">${t('ex.check')}</button>
+                    <button type="button" class="btn" data-act="reveal">${t('ex.reveal')}</button>
+                    <button type="button" class="btn" data-act="clear">${t('ex.clear')}</button>
+                    <button type="button" class="btn" data-act="blank">${t('ex.exportBlank')}</button>
+                    <button type="button" class="btn" data-act="key">${t('ex.exportKey')}</button>
                     <span class="score" aria-live="polite"></span>
                 </div>
             </section>

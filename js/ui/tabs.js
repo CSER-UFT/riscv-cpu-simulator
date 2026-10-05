@@ -40,9 +40,11 @@ export class TabManager extends EventTarget {
         title.addEventListener('click', this.setActive.bind(this, name));
 
         // Cria botão de fechamento
-        const closeButton = document.createElement('img');
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
         closeButton.className = 'close-tab';
-        closeButton.src = './svg/closeSmall.svg';
+        closeButton.setAttribute('aria-label', '×');
+        closeButton.innerHTML = '<span class="icon i-close" aria-hidden="true"></span>';
         closeButton.addEventListener('click', this.remove.bind(this, name));
 
         // Agrupa elementos de aba

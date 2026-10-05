@@ -4,7 +4,7 @@
 import * as fmt from '../riscv/format.js';
 import { t } from '../i18n/index.js';
 import { STAGES } from '../models/pipeline.js';
-import { esc, COLORS, SOFT, registersPanel, memoryPanel, cachePanel, predictorPanel, statsPanel, box } from './panels.js';
+import { esc, COLORS, registersPanel, memoryPanel, cachePanel, predictorPanel, statsPanel, box } from './panels.js';
 
 const LATCHES = ['IF/ID', 'ID/EX', 'EX/MEM', 'MEM/WB'];
 
@@ -54,7 +54,7 @@ function stagePanel(ctx, snap, stage, i, focus) {
     if (s) {
         const inst = ctx.sim.program.instructions[s.index];
         const c = s.dyn % COLORS.length;
-        style = `style="--row:${SOFT[c]};--ink:${COLORS[c]}"`;
+        style = `style="--tag:${COLORS[c]}"`;
         body = `<div class="pinst ${s.stalled ? 'stalled' : ''}"><code>${esc(inst.text)}</code></div>${slotDetails(ctx, stage, s, snap)}`;
     }
     return `<section class="panel stage ${s ? 'busy' : ''} ${focus.has(`stage:${stage}`) ? 'focus' : ''}" data-stage="${stage}" ${style}>
