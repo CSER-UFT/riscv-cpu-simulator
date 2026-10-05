@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { assemble } from '../js/riscv/parser.js';
 import { runReference } from '../js/riscv/machine.js';
-import { simulate } from '../js/tomasulo/engine.js';
+import { simulate } from '../js/simulator.js';
 
 /** Monta um programa e falha o teste se houver erros. */
 export function asm(source, options = {}) {
@@ -12,6 +12,15 @@ export function asm(source, options = {}) {
 
 /** Configurações de hardware variadas para exercitar o motor. */
 export const CONFIGS = {
+    'monociclo': { mode: 'single' },
+    'pipeline com encaminhamento': { mode: 'pipeline', predictor: 'not-taken' },
+    'pipeline sem encaminhamento': { mode: 'pipeline', predictor: 'taken', pipeline: { forwarding: false } },
+    'pipeline, desvio em ID, 2 bits e cache': {
+        mode: 'pipeline', predictor: '2bit', pipeline: { forwarding: true, branchStage: 'ID' },
+        cache: { enabled: true, size: 64, blockSize: 8, assoc: 2, hitLatency: 1, missLatency: 5 },
+        latency: { mul: 3, div: 6, fadd: 2, fmul: 3, fdiv: 5 },
+    },
+    'pipeline, desvio em ID, sem encaminhamento': { mode: 'pipeline', predictor: 'btfn', pipeline: { forwarding: false, branchStage: 'ID' } },
     'clássico padrão': { mode: 'classic' },
     'clássico mínimo': {
         mode: 'classic',

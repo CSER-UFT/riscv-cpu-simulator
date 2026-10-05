@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { simulate } from '../js/tomasulo/engine.js';
+import { simulate } from '../js/simulator.js';
 import { EXAMPLES } from '../js/examples.js';
 import { asm, CONFIGS, assertMatchesReference } from './helpers.js';
 
@@ -333,4 +333,63 @@ test('fmadd no Tomasulo usa três operandos', () => {
     const src = '# f1 = 2.0\n# f2 = 3.0\nfadd.s f3, f1, f1\nfmadd.s f4, f1, f2, f3';
     const sim = assertMatchesReference(asm(src), {}, 'fmadd');
     assert.equal(sim.final.f[4], 10);
+});
+
+// Pipeline de 5 estágios e monociclo --------------------------------------------------------------------------
+
+/** Ciclo em que a instrução dinâmica i passou pelo estágio indicado (primeira ocorrência). */
+const at = (sim, i, label) => sim.dyn.filter((d) => d.squashed === null)[i].marks.find((m) => m[1] === label)?.[0];
+
+test('pipeline: sem dependências, uma instrução termina por ciclo', () => {
+    const sim = simulate(asm('addi a0, zero, 1\naddi a1, zero, 2\naddi a2, zero, 3\naddi a3, zero, 4'), { mode: 'pipeline' });
+    assert.deepEqual(sim.dyn.map((d) => d.commit), [5, 6, 7, 8]);
+    assert.equal(sim.stats.cycles, 8);
+});
+
+test('pipeline: encaminhamento elimina a parada entre instruções da ALU', () => {
+    const src = 'addi a0, zero, 1\nadd a1, a0, a0';
+    const fwd = simulate(asm(src), { mode: 'pipeline' });
+    const nofwd = simulate(asm(src), { mode: 'pipeline', pipeline: { forwarding: false } });
+    assert.equal(at(fwd, 1, 'EX'), at(fwd, 0, 'EX') + 1);
+    assert.equal(at(nofwd, 1, 'EX'), at(nofwd, 0, 'WB') + 1, 'sem encaminhamento, lê no ciclo do WB do produtor');
+    assert.equal(nofwd.stats.dataStalls, 2);
+    assert.equal(fwd.stats.dataStalls, 0);
+});
+
+test('pipeline: load seguido de uso exige uma bolha mesmo com encaminhamento', () => {
+    const sim = simulate(asm('lw a0, 0(sp)\nadd a1, a0, a0'), { mode: 'pipeline' });
+    assert.equal(at(sim, 1, 'EX'), at(sim, 0, 'MEM') + 1);
+    assert.equal(sim.stats.dataStalls, 1);
+});
+
+test('pipeline: penalidade de desvio em EX e em ID', () => {
+    const src = 'beq zero, zero, l\naddi a0, a0, 1\naddi a1, a1, 1\nl: addi a2, a2, 1';
+    const ex = simulate(asm(src), { mode: 'pipeline', predictor: 'not-taken' });
+    const id = simulate(asm(src), { mode: 'pipeline', predictor: 'not-taken', pipeline: { branchStage: 'ID' } });
+    const ok = simulate(asm(src), { mode: 'pipeline', predictor: 'taken' });
+    assert.equal(ex.stats.flushed, 2);
+    assert.equal(id.stats.flushed, 1);
+    assert.equal(ok.stats.flushed, 0);
+    assert.equal(ex.stats.cycles - ok.stats.cycles, 2);
+    assert.equal(id.stats.cycles - ok.stats.cycles, 1);
+});
+
+test('pipeline: operação de várias etapas no EX bloqueia as seguintes', () => {
+    const sim = simulate(asm('mul a0, a1, a2\naddi a3, zero, 1'), { mode: 'pipeline', latency: { mul: 4 } });
+    assert.equal(at(sim, 1, 'EX'), at(sim, 0, 'EX') + 4);
+});
+
+test('pipeline: falha na cache prolonga o estágio MEM', () => {
+    const src = 'lw a0, 0(sp)\nlw a1, 4(sp)\naddi a2, zero, 1';
+    const sim = simulate(asm(src), { mode: 'pipeline', cache: { enabled: true, size: 64, blockSize: 16, assoc: 1, hitLatency: 1, missLatency: 6 } });
+    const memCycles = (i) => sim.dyn[i].marks.filter((m) => m[1] === 'MEM').length;
+    assert.equal(memCycles(0), 6);
+    assert.equal(memCycles(1), 1);
+});
+
+test('monociclo: CPI igual a 1', () => {
+    const sim = assertMatchesReference(asm(EXAMPLES.find((e) => e.id === 'loop').code), { mode: 'single' }, 'monociclo');
+    assert.equal(sim.stats.cycles, sim.stats.instructions);
+    for (let c = 1; c < sim.states.length; c++)
+        assert.ok(sim.interStates[c].length >= 3, 'cada ciclo é explicado em passos');
 });

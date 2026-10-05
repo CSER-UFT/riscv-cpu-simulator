@@ -51,8 +51,8 @@ export class Recorder {
         const state = this.getState();
         const snap = { seq: this.seq, focus, mem: this.getMem() };
         for (const [k, v] of Object.entries(state)) {
-            if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
-                snap[k] = v.map((item, i) => this.share(`${k}.${item.name ?? i}`, item));
+            if (Array.isArray(v) && v.some((x) => typeof x === 'object' && x !== null)) {
+                snap[k] = v.map((item, i) => this.share(`${k}.${item?.name ?? i}`, item));
             } else if (k === 'rob' && v) {
                 snap[k] = { head: v.head, count: v.count, entries: v.entries.map((e, i) => this.share(`rob.${i}`, e)) };
             } else if (k === 'regs') {
