@@ -37,9 +37,9 @@ export class Controller extends EventTarget {
 
             let handled = true;
             if (e.key === 'Home')
-                this.goTo(0, 0);
+                this.goToStart();
             else if (e.key === 'End')
-                this.goTo(this.numStates - 1, this.numInterStates[this.numStates - 1]);
+                this.goToEnd();
             else if (e.ctrlKey && e.key === 'ArrowLeft')
                 this.goBackCycle();
             else if (e.ctrlKey && e.key === 'ArrowRight')
@@ -53,10 +53,31 @@ export class Controller extends EventTarget {
             if (handled)
                 e.preventDefault();
         });
-        this.skipBack.addEventListener('click', this.goBackCycle.bind(this));
-        this.skipFwd.addEventListener('click', this.goFwdCycle.bind(this));
-        this.stepBack.addEventListener('click', this.goBackStep.bind(this));
-        this.stepFwd.addEventListener('click', this.goFwdStep.bind(this));
+        // Botões externos: início e fim. Botões internos: um passo (com Ctrl, um ciclo).
+        this.skipBack.addEventListener('click', this.goToStart.bind(this));
+        this.skipFwd.addEventListener('click', this.goToEnd.bind(this));
+        this.stepBack.addEventListener('click', (e) => (e.ctrlKey || e.metaKey ? this.goBackCycle() : this.goBackStep()));
+        this.stepFwd.addEventListener('click', (e) => (e.ctrlKey || e.metaKey ? this.goFwdCycle() : this.goFwdStep()));
+    }
+
+    /** Vai para o estado inicial. */
+    goToStart() {
+        if (this.atStart()) return;
+        this.goTo(0, 0);
+    }
+
+    /** Vai para o último estado da execução. */
+    goToEnd() {
+        if (this.atEnd()) return;
+        this.goTo(this.numStates - 1, this.numInterStates[this.numStates - 1]);
+    }
+
+    atStart() {
+        return this.curState <= 0 && this.curInterState <= 0;
+    }
+
+    atEnd() {
+        return this.curState >= this.numStates - 1 && this.curInterState >= this.numInterStates[this.numStates - 1];
     }
 
     /**
@@ -170,27 +191,12 @@ export class Controller extends EventTarget {
      * Atualiza os componentes visuais do controle.
      */
     redraw() {
-        // Desativa os botôes de voltar, caso necessário
-        if (this.curState <= 0) {
-            this.skipBack.className = this.skipBack.className.replace(/\bactive\b/g, '');
-            this.stepBack.className = this.stepBack.className.replace(/\bactive\b/g, '');
-        } else {
-            if (this.skipBack.className.split(' ').indexOf('active') === -1)
-                this.skipBack.className += ' active';
-            if (this.stepBack.className.split(' ').indexOf('active') === -1)
-                this.stepBack.className += ' active';
-        }
-
-        // Desativa os botôes de avançar, caso necessário
-        if (this.curState >= this.numStates - 1) {
-            this.skipFwd.className = this.skipFwd.className.replace(/\bactive\b/g, '');
-            this.stepFwd.className = this.stepFwd.className.replace(/\bactive\b/g, '');
-        } else {
-            if (this.skipFwd.className.split(' ').indexOf('active') === -1)
-                this.skipFwd.className += ' active';
-            if (this.stepFwd.className.split(' ').indexOf('active') === -1)
-                this.stepFwd.className += ' active';
-        }
+        // Ativa ou desativa os botões conforme a posição atual
+        const back = !this.atStart(), fwd = !this.atEnd();
+        this.skipBack.classList.toggle('active', back);
+        this.stepBack.classList.toggle('active', back);
+        this.skipFwd.classList.toggle('active', fwd);
+        this.stepFwd.classList.toggle('active', fwd);
 
         // Desativa o objeto de mensagem
         if (this.msg.textContent.length <= 0)

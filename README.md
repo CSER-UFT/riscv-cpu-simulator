@@ -33,7 +33,8 @@ Clique em **Nova Simulação**, escolha um exemplo ou escreva o programa, ajuste
 
 * `Seta direita` e `Seta esquerda`: avança ou volta um passo.
 * `Ctrl` + `Seta direita` e `Ctrl` + `Seta esquerda`: avança ou volta um ciclo.
-* `Home` e `End`: início e fim da execução.
+* `Home` e `End`, ou os botões das extremidades: início e fim da execução.
+* Botões internos: um passo; com `Ctrl` pressionado, um ciclo.
 * Arrastar, roda do mouse e duplo clique: mover, ampliar e restaurar o diagrama.
 
 ## Modelo de temporização

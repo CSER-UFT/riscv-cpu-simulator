@@ -47,7 +47,8 @@
                     <ul>
                         <li><code>Seta direita</code> e <code>Seta esquerda</code>: avança ou volta um passo.</li>
                         <li><code>Ctrl</code> + <code>Seta direita</code> e <code>Ctrl</code> + <code>Seta esquerda</code>: avança ou volta um ciclo.</li>
-                        <li><code>Home</code> e <code>End</code>: vai para o início ou para o fim da execução.</li>
+                        <li><code>Home</code> e <code>End</code>, ou os botões das extremidades: vai para o início ou para o fim da execução.</li>
+                        <li>Os botões internos avançam ou voltam um passo; com <code>Ctrl</code> pressionado, um ciclo.</li>
                         <li>Arraste o diagrama para mudar a posição e use a roda do mouse para ampliar; duplo clique restaura a posição.</li>
                     </ul>
                     <p>O código fonte está em <a href="https://github.com/CSER-UFT/riscv-simulator-tomasulo">github.com/CSER-UFT/riscv-simulator-tomasulo</a>.</p>
@@ -56,11 +57,11 @@
                     <div id="diagram"></div>
                 </div>
                 <div id="control">
-                    <div id="control-skip-back" class="control-button control-div active" title="Voltar um ciclo (Ctrl + seta esquerda)"><img src="./svg/skipBack.svg" alt="Voltar ciclo" /></div>
-                    <div id="control-step-back" class="control-button control-div active" title="Voltar um passo (seta esquerda)"><img src="./svg/stepBack.svg" alt="Voltar passo" /></div>
+                    <div id="control-skip-back" class="control-button control-div active" title="Ir para o início (Home)"><img src="./svg/skipBack.svg" alt="Início" /></div>
+                    <div id="control-step-back" class="control-button control-div active" title="Voltar um passo (seta esquerda); com Ctrl, voltar um ciclo"><img src="./svg/stepBack.svg" alt="Voltar passo" /></div>
                     <div id="control-counter" class="control-div"></div>
-                    <div id="control-step-fwd" class="control-button control-div active" title="Avançar um passo (seta direita)"><img src="./svg/stepFwd.svg" alt="Avançar passo" /></div>
-                    <div id="control-skip-fwd" class="control-button control-div active" title="Avançar um ciclo (Ctrl + seta direita)"><img src="./svg/skipFwd.svg" alt="Avançar ciclo" /></div>
+                    <div id="control-step-fwd" class="control-button control-div active" title="Avançar um passo (seta direita); com Ctrl, avançar um ciclo"><img src="./svg/stepFwd.svg" alt="Avançar passo" /></div>
+                    <div id="control-skip-fwd" class="control-button control-div active" title="Ir para o fim (End)"><img src="./svg/skipFwd.svg" alt="Fim" /></div>
                     <div id="control-msg"></div>
                 </div>
             </div>
