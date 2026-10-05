@@ -1,11 +1,16 @@
+import { getLanguage } from './i18n/index.js';
+
 /**
  * Programas de exemplo exibidos na janela de Nova Simulação.
  * `config` (opcional) sugere ajustes de configuração que evidenciam o fenômeno do exemplo.
  */
+export const exampleName = (ex) => (getLanguage() === 'en' ? ex.nameEn : ex.name);
+
 export const EXAMPLES = [
     {
         id: 'ooo',
         name: 'Execução fora de ordem',
+        nameEn: 'Out-of-order execution',
         code: `# Instruções independentes terminam antes das mais lentas.
 # Valores iniciais podem ser dados em comentários: # registrador = valor
 .data
@@ -24,6 +29,7 @@ b:  .float 4.0
     {
         id: 'raw',
         name: 'Dependência RAW (leitura após escrita)',
+        nameEn: 'RAW dependence (read after write)',
         code: `# f1 = 2.0
 # f2 = 3.0
     fmul.s f4, f1, f2     # produz f4
@@ -33,6 +39,7 @@ b:  .float 4.0
     {
         id: 'war',
         name: 'Dependência WAR (escrita após leitura)',
+        nameEn: 'WAR dependence (write after read)',
         code: `# f1 = 2.0
 # f2 = 3.0
 # f5 = 1.5
@@ -43,6 +50,7 @@ b:  .float 4.0
     {
         id: 'waw',
         name: 'Dependência WAW (escrita após escrita)',
+        nameEn: 'WAW dependence (write after write)',
         code: `# f1 = 2.0
 # f2 = 3.0
 # f3 = 4.0
@@ -54,6 +62,7 @@ b:  .float 4.0
     {
         id: 'loop',
         name: 'Laço (iterações simultâneas)',
+        nameEn: 'Loop (overlapping iterations)',
         code: `.data
 vetor: .float 1.5, 2.5, 3.5, 4.5
 .text
@@ -73,6 +82,7 @@ laco:
     {
         id: 'mem',
         name: 'Dependência pela memória',
+        nameEn: 'Memory dependence',
         code: `# O store e o load usam registradores base diferentes,
 # mas acessam o mesmo endereço: o load precisa esperar.
 # t2 = 5
@@ -88,6 +98,7 @@ laco:
     {
         id: 'branch',
         name: 'Desvios e especulação',
+        nameEn: 'Branches and speculation',
         config: { mode: 'rob' },
         code: `# Use o modo ROB e compare os preditores de desvio.
     li     t0, 0          # contador
@@ -105,6 +116,7 @@ impar:
     {
         id: 'call',
         name: 'Chamada de função recursiva',
+        nameEn: 'Recursive function call',
         code: `    li     a0, 5
     call   fatorial
     mv     s0, a0
@@ -132,6 +144,7 @@ fim:
     {
         id: 'struct',
         name: 'Conflito estrutural',
+        nameEn: 'Structural hazard',
         code: `# Há apenas duas estações Mul na configuração padrão.
 # a1 = 3
 # a2 = 4
@@ -139,6 +152,71 @@ fim:
     mul    a3, a1, a2
     mul    a4, a1, a2
     add    a5, a1, a2
+`,
+    },
+    {
+        id: 'pipe',
+        name: 'Pipeline: encaminhamento e load seguido de uso',
+        nameEn: 'Pipeline: forwarding and load-use',
+        config: { mode: 'pipeline' },
+        code: `# Compare com e sem encaminhamento, e com desvio resolvido em EX ou ID.
+.data
+v:  .word 5, 7
+.text
+    la    a0, v
+    lw    t0, 0(a0)       # load
+    add   t1, t0, t0      # uso imediato: uma bolha mesmo com encaminhamento
+    lw    t2, 4(a0)
+    sub   t3, t1, t2      # encaminhamento de MEM/WB e EX/MEM
+    beq   t3, zero, fim   # desvio dependente da instrução anterior
+    addi  t4, t3, 1
+fim:
+    sw    t4, 8(a0)
+`,
+    },
+    {
+        id: 'single',
+        name: 'Monociclo: tipos de instrução',
+        nameEn: 'Single cycle: instruction types',
+        config: { mode: 'single' },
+        code: `# Cada instrução usa uma parte diferente do caminho de dados.
+.data
+x:  .word 10
+.text
+    la    a0, x
+    lw    t0, 0(a0)       # tipo I, load: usa a memória de dados
+    addi  t1, t0, 5       # tipo I, aritmética
+    add   t2, t0, t1      # tipo R
+    sw    t2, 4(a0)       # tipo S
+    beq   t2, t1, fim     # tipo B
+    jal   ra, fim         # tipo J
+fim:
+    lui   t3, 0x12345     # tipo U
+`,
+    },
+    {
+        id: 'fmadd',
+        name: 'SAXPY com fmadd (três operandos)',
+        nameEn: 'SAXPY with fmadd (three operands)',
+        code: `.data
+x:  .float 1.0, 2.0, 3.0, 4.0
+y:  .float 0.5, 0.25, 0.125, 0.0625
+a:  .float 3.0
+.text
+    la     a0, x
+    la     a1, y
+    la     t0, a
+    flw    fa0, 0(t0)
+    li     a2, 4
+laco:
+    flw    ft0, 0(a0)
+    flw    ft1, 0(a1)
+    fmadd.s ft2, fa0, ft0, ft1   # y = a * x + y, com um único arredondamento
+    fsw    ft2, 0(a1)
+    addi   a0, a0, 4
+    addi   a1, a1, 4
+    addi   a2, a2, -1
+    bnez   a2, laco
 `,
     },
 ];

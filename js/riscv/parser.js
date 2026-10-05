@@ -15,6 +15,7 @@ import { lookup } from './isa.js';
 import { canonical, bank } from './registers.js';
 import { signed, unsigned, f32ToBits, f64ToBits } from './bits.js';
 import { writeRaw } from './memory.js';
+import { t } from '../i18n/index.js';
 
 export const TEXT_BASE = 0x0;
 export const DATA_BASE = 0x10000;
@@ -75,7 +76,7 @@ function splitList(text) {
 
 function parseString(tok) {
     const m = /^"((?:[^"\\]|\\.)*)"$/.exec(tok.trim());
-    if (!m) fail(`string inválida: ${tok}`);
+    if (!m) fail(t('asm.badString', { tok }));
     return m[1].replace(/\\(.)/g, (_, c) => ({ n: '\n', t: '\t', r: '\r', 0: '\0', '\\': '\\', '"': '"', '\'': '\'' })[c] ?? c);
 }
 
@@ -123,7 +124,7 @@ export function assemble(source, { xlen = 32 } = {}) {
     const placeLabels = (addr) => {
         for (const { name, lineNo } of pendingLabels) {
             if (symbols.has(name))
-                report(lineNo, `rótulo "${name}" definido mais de uma vez`);
+                report(lineNo, t('asm.labelTwice', { name }));
             else
                 symbols.set(name, { value: BigInt(addr), kind: 'label', section });
             if (section === 'data')
@@ -158,7 +159,7 @@ export function assemble(source, { xlen = 32 } = {}) {
         if ((m = /^([A-Za-z_.$][\w.$]*)\s*([+-])\s*(\S+)$/.exec(tok))) {
             const base = evalImm(m[1], ctx);
             const off = parseIntLiteral(m[3]);
-            if (off === null) fail(`deslocamento inválido em "${tok}"`);
+            if (off === null) fail(t('asm.badOffsetIn', { tok }));
             return m[2] === '+' ? base + off : base - off;
         }
         if (isSymbolName(tok)) {
@@ -166,9 +167,9 @@ export function assemble(source, { xlen = 32 } = {}) {
                 return symbols.get(tok).value;
             if (ctx.allowForward)
                 return null;
-            fail(`símbolo "${tok}" não definido`);
+            fail(t('asm.undefinedSymbol', { tok }));
         }
-        fail(`imediato inválido: "${tok}"`);
+        fail(t('asm.badImmediate', { tok }));
     };
 
     // Expansão de pseudoinstruções. Retorna uma lista de [mnemônico, operandos].
@@ -198,7 +199,7 @@ export function assemble(source, { xlen = 32 } = {}) {
     };
 
     const expand = (mn, ops) => {
-        const need = (n) => { if (ops.length !== n) fail(`"${mn}" espera ${n} operando(s), recebeu ${ops.length}`); };
+        const need = (n) => { if (ops.length !== n) fail(t('asm.operandCount', { name: mn, n, got: ops.length })); };
         const p = mn.endsWith('.d') ? 'd' : 's';
         switch (mn) {
             case 'nop': need(0); return [['addi', ['zero', 'zero', '0']]];
@@ -206,7 +207,7 @@ export function assemble(source, { xlen = 32 } = {}) {
                 need(2);
                 const v = evalImm(ops[1]);
                 const lim = 1n << BigInt(xlen);
-                if (v < -(lim >> 1n) || v >= lim) fail(`valor ${v} não cabe em ${xlen} bits`);
+                if (v < -(lim >> 1n) || v >= lim) fail(t('asm.valueTooBig', { v, xlen }));
                 return liSequence(ops[0], v);
             }
             case 'la': need(2); return [
@@ -247,7 +248,7 @@ export function assemble(source, { xlen = 32 } = {}) {
         // Load com rótulo: lw rd, simbolo  ->  auipc rd, %pcrel_hi; lw rd, %pcrel_lo(rd)
         if (d && d.fmt === 'L' && ops.length >= 2 && !ops[1].includes('(') && canonical(ops[1]) === null) {
             const tmp = ops.length === 3 ? ops[2] : ops[0];
-            if (ops.length === 2 && d.rd !== 'x') fail(`"${mn} ${ops[0]}, ${ops[1]}" exige um registrador temporário inteiro: ${mn} ${ops[0]}, ${ops[1]}, t0`);
+            if (ops.length === 2 && d.rd !== 'x') fail(t('asm.needTemp', { inst: `${mn} ${ops[0]}, ${ops[1]}` }));
             return [
                 ['auipc', [tmp, { part: 'hi', sym: ops[1], anchor: 0 }]],
                 [mn, [ops[0], { mem: { part: 'lo', sym: ops[1], anchor: 4 }, reg: tmp }]],
@@ -269,14 +270,14 @@ export function assemble(source, { xlen = 32 } = {}) {
         if (im && canonical(im[1]) !== null) {
             const reg = canonical(im[1]);
             if (reg === 'x0') {
-                report(lineNo, 'x0 é sempre zero e não pode receber valor inicial');
+                report(lineNo, t('asm.initX0'));
             } else if (bank(reg) === 'x') {
                 const v = parseIntLiteral(im[2]);
-                if (v === null) report(lineNo, `valor inicial inválido para ${im[1]}: "${im[2]}" (registrador inteiro)`);
+                if (v === null) report(lineNo, t('asm.badInitInt', { reg: im[1], value: im[2] }));
                 else init.x.set(reg, signed(v, xlen));
             } else {
                 const v = Number(im[2]);
-                if (Number.isNaN(v) && im[2].toLowerCase() !== 'nan') report(lineNo, `valor inicial inválido para ${im[1]}: "${im[2]}"`);
+                if (Number.isNaN(v) && im[2].toLowerCase() !== 'nan') report(lineNo, t('asm.badInit', { reg: im[1], value: im[2] }));
                 else init.f.set(reg, v);
             }
         }
@@ -301,7 +302,7 @@ export function assemble(source, { xlen = 32 } = {}) {
             }
 
             if (section !== 'text')
-                fail(`instrução "${head}" fora da seção .text`);
+                fail(t('asm.outsideText', { name: head }));
 
             placeLabels(pc);
             const ops = splitOperands(rest);
@@ -317,7 +318,7 @@ export function assemble(source, { xlen = 32 } = {}) {
 
     function handleDirective(dir, rest, lineNo) {
         const args = splitList(rest);
-        const dataOnly = () => { if (section !== 'data') fail(`diretiva ${dir} só é permitida na seção .data`); };
+        const dataOnly = () => { if (section !== 'data') fail(t('asm.dataOnly', { dir })); };
         const emitInts = (size) => {
             dataOnly();
             alignData(size);
@@ -340,7 +341,7 @@ export function assemble(source, { xlen = 32 } = {}) {
             case '.globl': case '.global': case '.type': case '.size': case '.file': case '.ident': case '.option': case '.local':
                 return;
             case '.equ': case '.set': {
-                if (args.length !== 2 || !isSymbolName(args[0])) fail(`uso: ${dir} nome, valor`);
+                if (args.length !== 2 || !isSymbolName(args[0])) fail(t('asm.equUsage', { dir }));
                 symbols.set(args[0], { value: evalImm(args[1]), kind: 'const' });
                 return;
             }
@@ -355,7 +356,7 @@ export function assemble(source, { xlen = 32 } = {}) {
                 placeLabels(dp);
                 for (const a of args) {
                     const v = Number(a);
-                    if (Number.isNaN(v) && a.toLowerCase() !== 'nan') fail(`valor de ponto flutuante inválido: "${a}"`);
+                    if (Number.isNaN(v) && a.toLowerCase() !== 'nan') fail(t('asm.badFloat', { value: a }));
                     writeRaw(data, BigInt(dp), size, size === 4 ? f32ToBits(v) : f64ToBits(v));
                     dp += size;
                 }
@@ -365,7 +366,7 @@ export function assemble(source, { xlen = 32 } = {}) {
                 dataOnly();
                 placeLabels(dp);
                 const n = Number(evalImm(args[0] ?? ''));
-                if (n < 0) fail('tamanho negativo');
+                if (n < 0) fail(t('asm.negativeSize'));
                 for (let i = 0; i < n; i++) data.set(BigInt(dp + i), 0);
                 dp += n;
                 return;
@@ -387,11 +388,11 @@ export function assemble(source, { xlen = 32 } = {}) {
                 return;
             }
         }
-        fail(`diretiva desconhecida: ${dir}`);
+        fail(t('asm.unknownDirective', { dir }));
     }
 
     if (pc > DATA_BASE)
-        report(lines.length, `o código ultrapassa o início da área de dados (0x${DATA_BASE.toString(16)})`);
+        report(lines.length, t('asm.codeTooBig', { addr: `0x${DATA_BASE.toString(16)}` }));
 
     // Segunda passagem: gera as instruções com símbolos resolvidos -------------------------------------------
     for (const fx of dataFixups) {
@@ -424,17 +425,17 @@ export function assemble(source, { xlen = 32 } = {}) {
     }
 
     function regOperand(tok, expectedBank, what) {
-        if (typeof tok !== 'string') fail(`esperado registrador em ${what}`);
+        if (typeof tok !== 'string') fail(t('asm.expectedReg', { what: t(what) }));
         const r = canonical(tok);
-        if (r === null) fail(`"${tok}" não é um registrador válido (${what})`);
+        if (r === null) fail(t('asm.badReg', { tok, what: t(what) }));
         if (bank(r) !== expectedBank)
-            fail(`${what} deve ser um registrador ${expectedBank === 'x' ? 'inteiro (x0 a x31)' : 'de ponto flutuante (f0 a f31)'}, mas "${tok}" não é`);
+            fail(t(expectedBank === 'x' ? 'asm.needIntReg' : 'asm.needFloatReg', { what: t(what), tok }));
         return { reg: r, name: tok };
     }
 
     function immOperand(tok, pcHere, lo, hi, what) {
         const v = evalImm(tok, { pc: pcHere });
-        if (v < lo || v > hi) fail(`${what} ${v} fora do intervalo [${lo}, ${hi}]`);
+        if (v < lo || v > hi) fail(t('asm.outOfRange', { what: t(what), v, lo, hi }));
         return v;
     }
 
@@ -444,9 +445,9 @@ export function assemble(source, { xlen = 32 } = {}) {
             return { off, base: tok.reg, offText: `${off}` };
         }
         const m = /^(.*)\(([^()]+)\)$/.exec(tok);
-        if (!m) fail(`operando de memória inválido: "${tok}" (use deslocamento(registrador), por exemplo 8(sp))`);
+        if (!m) fail(t('asm.badMem', { tok }));
         const off = m[1].length === 0 ? 0n : evalImm(m[1], { pc: pcHere });
-        if (off < -2048n || off > 2047n) fail(`deslocamento ${off} fora do intervalo [-2048, 2047]`);
+        if (off < -2048n || off > 2047n) fail(t('asm.outOfRange', { what: t('asm.what.offset'), v: off, lo: -2048, hi: 2047 }));
         return { off, base: m[2], offText: m[1].length === 0 ? '0' : `${off}` };
     }
 
@@ -460,15 +461,15 @@ export function assemble(source, { xlen = 32 } = {}) {
             label = tok;
         }
         const off = target - pcHere;
-        if (off % 2 !== 0) fail(`destino de desvio desalinhado: ${tok}`);
-        if (off < -range || off >= range) fail(`destino "${tok}" fora do alcance da instrução`);
+        if (off % 2 !== 0) fail(t('asm.misaligned', { tok }));
+        if (off < -range || off >= range) fail(t('asm.targetRange', { tok }));
         return { target, text: label ?? `${off}` };
     }
 
     function buildInstruction(name, ops, ipc) {
         const d = lookup(name);
-        if (!d) fail(`instrução desconhecida: "${name}"`);
-        if (d.rv64 && xlen !== 64) fail(`"${name}" pertence ao RV64; altere XLEN para 64 na configuração`);
+        if (!d) fail(t('asm.unknownInstruction', { name }));
+        if (d.rv64 && xlen !== 64) fail(t('asm.needRv64', { name }));
 
         const inst = { name, def: d, pc: ipc, rd: null, rs1: null, rs2: null, rs3: null, imm: 0, target: null, rm: null };
         const opsText = [];
@@ -479,7 +480,7 @@ export function assemble(source, { xlen = 32 } = {}) {
             if (inst.rm === 'dyn') inst.rm = null;
             rest = rest.slice(0, -1);
         }
-        const need = (n) => { if (rest.length !== n) fail(`"${name}" espera ${n} operando(s), recebeu ${rest.length}`); };
+        const need = (n) => { if (rest.length !== n) fail(t('asm.operandCount', { name, n, got: rest.length })); };
         const setReg = (field, tok, what) => {
             const r = regOperand(tok, d[field], what);
             inst[field] = r.reg;
@@ -489,50 +490,50 @@ export function assemble(source, { xlen = 32 } = {}) {
         switch (d.fmt) {
             case 'R':
                 need(3);
-                setReg('rd', rest[0], 'destino');
-                setReg('rs1', rest[1], 'primeiro operando');
-                setReg('rs2', rest[2], 'segundo operando');
+                setReg('rd', rest[0], 'asm.what.dest');
+                setReg('rs1', rest[1], 'asm.what.rs1');
+                setReg('rs2', rest[2], 'asm.what.rs2');
                 break;
             case 'R4':
                 need(4);
-                setReg('rd', rest[0], 'destino');
-                setReg('rs1', rest[1], 'primeiro operando');
-                setReg('rs2', rest[2], 'segundo operando');
-                setReg('rs3', rest[3], 'terceiro operando');
+                setReg('rd', rest[0], 'asm.what.dest');
+                setReg('rs1', rest[1], 'asm.what.rs1');
+                setReg('rs2', rest[2], 'asm.what.rs2');
+                setReg('rs3', rest[3], 'asm.what.rs3');
                 break;
             case 'R2':
                 need(2);
-                setReg('rd', rest[0], 'destino');
-                setReg('rs1', rest[1], 'operando');
+                setReg('rd', rest[0], 'asm.what.dest');
+                setReg('rs1', rest[1], 'asm.what.src');
                 break;
             case 'I':
                 need(3);
-                setReg('rd', rest[0], 'destino');
-                setReg('rs1', rest[1], 'primeiro operando');
-                inst.imm = Number(immOperand(rest[2], ipc, -2048n, 2047n, 'imediato'));
+                setReg('rd', rest[0], 'asm.what.dest');
+                setReg('rs1', rest[1], 'asm.what.rs1');
+                inst.imm = Number(immOperand(rest[2], ipc, -2048n, 2047n, 'asm.what.imm'));
                 opsText.push(`${inst.imm}`);
                 break;
             case 'SH': {
                 need(3);
-                setReg('rd', rest[0], 'destino');
-                setReg('rs1', rest[1], 'primeiro operando');
+                setReg('rd', rest[0], 'asm.what.dest');
+                setReg('rs1', rest[1], 'asm.what.rs1');
                 const bits = d.shamtBits ?? (xlen === 64 ? 6 : 5);
-                inst.imm = Number(immOperand(rest[2], ipc, 0n, BigInt((1 << bits) - 1), 'deslocamento'));
+                inst.imm = Number(immOperand(rest[2], ipc, 0n, BigInt((1 << bits) - 1), 'asm.what.shamt'));
                 opsText.push(`${inst.imm}`);
                 break;
             }
             case 'U':
                 need(2);
-                setReg('rd', rest[0], 'destino');
-                inst.imm = Number(unsigned(immOperand(rest[1], ipc, -(1n << 19n), (1n << 20n) - 1n, 'imediato'), 20));
+                setReg('rd', rest[0], 'asm.what.dest');
+                inst.imm = Number(unsigned(immOperand(rest[1], ipc, -(1n << 19n), (1n << 20n) - 1n, 'asm.what.imm'), 20));
                 opsText.push(`0x${inst.imm.toString(16)}`);
                 break;
             case 'L': case 'S': {
                 need(2);
-                if (d.fmt === 'L') setReg('rd', rest[0], 'destino');
-                else setReg('rs2', rest[0], 'valor a armazenar');
+                if (d.fmt === 'L') setReg('rd', rest[0], 'asm.what.dest');
+                else setReg('rs2', rest[0], 'asm.what.storeValue');
                 const m = memOperand(rest[1], ipc);
-                const r = regOperand(m.base, 'x', 'registrador base');
+                const r = regOperand(m.base, 'x', 'asm.what.base');
                 inst.rs1 = r.reg;
                 inst.imm = Number(m.off);
                 opsText.push(`${m.offText}(${r.name})`);
@@ -540,8 +541,8 @@ export function assemble(source, { xlen = 32 } = {}) {
             }
             case 'B': {
                 need(3);
-                setReg('rs1', rest[0], 'primeiro operando');
-                setReg('rs2', rest[1], 'segundo operando');
+                setReg('rs1', rest[0], 'asm.what.rs1');
+                setReg('rs2', rest[1], 'asm.what.rs2');
                 const t = targetOperand(rest[2], ipc, 4096);
                 inst.target = t.target;
                 inst.imm = t.target - ipc;
@@ -550,7 +551,7 @@ export function assemble(source, { xlen = 32 } = {}) {
             }
             case 'J': {
                 need(2);
-                setReg('rd', rest[0], 'destino');
+                setReg('rd', rest[0], 'asm.what.dest');
                 const t = targetOperand(rest[1], ipc, 1 << 20);
                 inst.target = t.target;
                 inst.imm = t.target - ipc;
@@ -559,18 +560,18 @@ export function assemble(source, { xlen = 32 } = {}) {
             }
             case 'JR': {
                 if (rest.length === 3) {
-                    setReg('rd', rest[0], 'destino');
-                    setReg('rs1', rest[1], 'registrador base');
-                    inst.imm = Number(immOperand(rest[2], ipc, -2048n, 2047n, 'imediato'));
+                    setReg('rd', rest[0], 'asm.what.dest');
+                    setReg('rs1', rest[1], 'asm.what.base');
+                    inst.imm = Number(immOperand(rest[2], ipc, -2048n, 2047n, 'asm.what.imm'));
                     opsText.push(`${inst.imm}`);
                 } else {
                     need(2);
-                    setReg('rd', rest[0], 'destino');
+                    setReg('rd', rest[0], 'asm.what.dest');
                     if (canonical(rest[1]) !== null) {
-                        setReg('rs1', rest[1], 'registrador base');
+                        setReg('rs1', rest[1], 'asm.what.base');
                     } else {
                         const m = memOperand(rest[1], ipc);
-                        const r = regOperand(m.base, 'x', 'registrador base');
+                        const r = regOperand(m.base, 'x', 'asm.what.base');
                         inst.rs1 = r.reg;
                         inst.imm = Number(m.off);
                         opsText.push(`${m.offText}(${r.name})`);
@@ -582,7 +583,7 @@ export function assemble(source, { xlen = 32 } = {}) {
                 need(0);
                 break;
             default:
-                fail(`formato desconhecido para ${name}`);
+                fail(t('asm.unknownFormat', { name }));
         }
         if (inst.rm) opsText.push(inst.rm);
         inst.text = opsText.length > 0 ? `${name} ${opsText.join(', ')}` : name;
@@ -591,7 +592,7 @@ export function assemble(source, { xlen = 32 } = {}) {
 
     errors.sort((a, b) => a.line - b.line);
     if (errors.length === 0 && instructions.length === 0)
-        errors.push({ line: 1, message: 'o programa não contém instruções' });
+        errors.push({ line: 1, message: t('asm.empty') });
 
     const labels = new Map();
     for (const [name, s] of symbols)

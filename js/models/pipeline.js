@@ -64,6 +64,7 @@ export function simulatePipeline(program, userConfig = {}) {
         return {
             dyn: s.dyn, index: s.index, a: s.a, b: s.b, c: s.c, result: s.result, addr: s.addr,
             remaining: s.remaining, total: s.total, done: s.done, stalled: s.stalled, taken: s.taken, next: s.next,
+            predicted: s.predicted, predictedNext: s.predictedNext,
         };
     }
 

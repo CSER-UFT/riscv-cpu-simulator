@@ -3,92 +3,148 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Simulador de Tomasulo RISC-V</title>
+        <title>Simulador Superescalar RISC-V</title>
         <link rel="icon" href="./svg/cpu.svg" />
         <link rel="stylesheet" type="text/css" href="./css/index.css" />
     </head>
     <body>
         <div id="workspace" class="screen">
             <div id="header">
-                <img class="logo" src="./svg/cpu.svg" alt="Chip" />
-                <div class="title">Simulador<br />Superescalar</div>
-                <div id="open-novo" class="button"><img src="./svg/new.svg" alt="" />Nova Simulação</div>
-                <div id="open-editar" class="button hidden"><img src="./svg/new.svg" alt="" />Editar esta simulação</div>
-                <div id="copy-link" class="button hidden" title="Copia um link que abre esta simulação">Copiar link</div>
-                <div id="open-ajuda" class="button">Ajuda</div>
+                <img class="logo" src="./svg/cpu.svg" alt="" />
+                <div class="title" data-i18n-html="ui.appTitle">Simulador<br />Superescalar</div>
+                <div id="open-novo" class="button"><img src="./svg/new.svg" alt="" /><span data-i18n="ui.new">Nova Simulação</span></div>
+                <div id="open-editar" class="button hidden" data-i18n="ui.edit">Editar</div>
+                <div id="open-comparar" class="button hidden" data-i18n="ui.compare" data-i18n-title="ui.compareHelp">Comparar</div>
+                <div id="open-exercicio" class="button hidden" data-i18n="ui.exercise" data-i18n-title="ui.exerciseHelp">Exercício</div>
+                <div id="export-menu" class="button menu hidden">
+                    <span data-i18n="ui.export">Exportar</span>
+                    <div class="menu-items">
+                        <div data-export="timeline-csv" data-i18n="ui.exp.timelineCsv">Linha do tempo (CSV)</div>
+                        <div data-export="timeline-tex" data-i18n="ui.exp.timelineTex">Linha do tempo (LaTeX)</div>
+                        <div data-export="events-csv" data-i18n="ui.exp.eventsCsv">Tabela de eventos (CSV)</div>
+                        <div data-export="events-tex" data-i18n="ui.exp.eventsTex">Tabela de eventos (LaTeX)</div>
+                        <div data-export="events-blank" data-i18n="ui.exp.eventsBlank">Tabela de eventos em branco (LaTeX)</div>
+                    </div>
+                </div>
+                <div id="copy-link" class="button hidden" data-i18n="ui.copyLink" data-i18n-title="ui.copyLinkHelp">Copiar link</div>
+                <div class="spacer"></div>
+                <label class="lang"><span class="sr-only" data-i18n="ui.language">Idioma</span><select id="lang-select"></select></label>
+                <div id="open-ajuda" class="button" data-i18n="ui.help">Ajuda</div>
             </div>
             <div id="tab-names"><div id="tab-filler">&nbsp;</div></div>
             <div id="tab-visual">
                 <div id="readme">
-                    <h1>Simulador de Tomasulo RISC-V</h1>
-                    <p>Simulador didático de processadores superescalares com escalonamento dinâmico pelo <a href="https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo">algoritmo de Tomasulo</a>, desenvolvido para o curso de <strong>Ciência da Computação</strong> da <strong>Universidade Federal do Tocantins</strong>.</p>
-                    <p>Clique em <strong>Nova Simulação</strong>, escolha um exemplo ou escreva um programa em assembly RISC-V, ajuste o processador e execute. A execução pode ser acompanhada ciclo a ciclo, ou passo a passo dentro de cada ciclo, no diagrama e na linha do tempo.</p>
-
-                    <h2>Modelos de processador</h2>
-                    <ul>
-                        <li><strong>Tomasulo clássico</strong>: estações de reserva, renomeação de registradores pelo nome da estação e difusão de resultados pelo CDB. Não há especulação: depois de um desvio, nenhuma instrução é emitida até ele ser resolvido.</li>
-                        <li><strong>Tomasulo com ROB</strong>: acrescenta o buffer de reordenação, commit em ordem e execução especulativa com previsão de desvios (estática ou dinâmica de 1 e 2 bits). Previsões erradas são corrigidas no commit, descartando o caminho errado.</li>
-                    </ul>
-                    <p>Quantidade de estações por grupo, classes de instrução aceitas por grupo, latências, largura de emissão, de CDB e de commit, tamanho do ROB e preditor são configuráveis.</p>
-
-                    <h2>Linguagem aceita</h2>
-                    <ul>
-                        <li><strong>RV32I e RV64I</strong> (escolha o XLEN na configuração), extensão <strong>M</strong> (multiplicação e divisão) e extensões <strong>F</strong> e <strong>D</strong> (ponto flutuante de precisão simples e dupla, exceto as instruções de multiplicação e soma fundidas).</li>
-                        <li>Pseudoinstruções usuais: <code>li</code>, <code>la</code>, <code>mv</code>, <code>not</code>, <code>neg</code>, <code>nop</code>, <code>j</code>, <code>call</code>, <code>ret</code>, <code>beqz</code>, <code>bnez</code>, <code>bgt</code>, <code>ble</code>, <code>fmv.s</code>, <code>fneg.s</code>, entre outras.</li>
-                        <li>Nomes de registradores numéricos (<code>x10</code>, <code>f2</code>) ou da ABI (<code>a0</code>, <code>ft2</code>); <code>x0</code> vale sempre zero.</li>
-                        <li>Rótulos, seções <code>.text</code> e <code>.data</code> e as diretivas <code>.word</code>, <code>.half</code>, <code>.byte</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code>, <code>.align</code>, <code>.string</code> e <code>.equ</code>. A área de dados começa em <code>0x10000</code> e <code>sp</code> começa em <code>0x7fff0</code>.</li>
-                        <li>Valores iniciais de registradores podem ser dados em comentários: <code># a0 = 10</code> ou <code># f1 = 2.5</code>.</li>
-                        <li>Registradores lidos pelo programa, nunca escritos e sem valor inicial recebem valores de exemplo (opção que pode ser desligada).</li>
-                        <li><code>ecall</code> e <code>ebreak</code> encerram o programa; ele também termina quando a execução passa da última instrução.</li>
-                    </ul>
-                    <p>Erros no programa são indicados com o número da linha. A aritmética segue a especificação RISC-V: inteiros com XLEN bits em complemento de dois, divisão por zero sem exceção e ponto flutuante IEEE 754.</p>
-
-                    <h2>Controles</h2>
-                    <ul>
-                        <li><code>Seta direita</code> e <code>Seta esquerda</code>: avança ou volta um passo.</li>
-                        <li><code>Ctrl</code> + <code>Seta direita</code> e <code>Ctrl</code> + <code>Seta esquerda</code>: avança ou volta um ciclo.</li>
-                        <li><code>Home</code> e <code>End</code>, ou os botões das extremidades: vai para o início ou para o fim da execução.</li>
-                        <li>Os botões internos avançam ou voltam um passo; com <code>Ctrl</code> pressionado, um ciclo.</li>
-                        <li>Arraste o diagrama para mudar a posição e use a roda do mouse para ampliar; duplo clique restaura a posição.</li>
-                    </ul>
-                    <p>O código fonte está em <a href="https://github.com/CSER-UFT/riscv-simulator-tomasulo">github.com/CSER-UFT/riscv-simulator-tomasulo</a>.</p>
+                    <div lang="pt">
+                        <h1>Simulador Superescalar RISC-V</h1>
+                        <p>Simulador didático de processadores RISC-V, do monociclo ao escalonamento dinâmico pelo <a href="https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo">algoritmo de Tomasulo</a>, desenvolvido para o curso de <strong>Ciência da Computação</strong> da <strong>Universidade Federal do Tocantins</strong>.</p>
+                        <p>Clique em <strong>Nova Simulação</strong>, escolha um exemplo ou escreva um programa em assembly RISC-V, ajuste o processador e execute. A execução pode ser acompanhada ciclo a ciclo, ou passo a passo dentro de cada ciclo, no diagrama e na linha do tempo.</p>
+                        <h2>Modelos de processador</h2>
+                        <ul>
+                            <li><strong>Monociclo</strong>: cada instrução em um ciclo, com o caminho de dados e os sinais de controle destacados a cada passo.</li>
+                            <li><strong>Pipeline de 5 estágios</strong>: IF, ID, EX, MEM e WB, com encaminhamento opcional, desvio resolvido em EX ou ID, previsão de desvios, operações de várias etapas no EX e cache de dados.</li>
+                            <li><strong>Tomasulo clássico</strong>: estações de reserva, renomeação pelo nome da estação e difusão pelo CDB; sem especulação.</li>
+                            <li><strong>Tomasulo com ROB</strong>: buffer de reordenação, commit em ordem, especulação com previsão de desvios e recuperação no commit ou na execução.</li>
+                        </ul>
+                        <p>No Tomasulo são configuráveis os grupos de estações, as unidades funcionais de cada grupo (com ou sem pipeline), as latências, as larguras de emissão, de CDB e de commit, o tamanho do ROB, o encaminhamento de store para load e a cache.</p>
+                        <h2>Recursos para aula</h2>
+                        <ul>
+                            <li><strong>Exercício</strong>: o aluno preenche em que ciclo ocorre cada evento de cada instrução e o simulador corrige. O link copiado de um exercício abre diretamente nele.</li>
+                            <li><strong>Comparar</strong>: executa o mesmo programa com outra configuração e mostra as duas linhas do tempo e as estatísticas lado a lado.</li>
+                            <li><strong>Exportar</strong>: linha do tempo e tabela de eventos em CSV e LaTeX (inclusive em branco, para provas).</li>
+                        </ul>
+                        <h2>Linguagem aceita</h2>
+                        <ul>
+                            <li><strong>RV32I e RV64I</strong>, extensões <strong>M</strong>, <strong>F</strong> e <strong>D</strong> (inclusive <code>fmadd</code>, <code>fmsub</code>, <code>fnmadd</code> e <code>fnmsub</code>).</li>
+                            <li>Pseudoinstruções usuais: <code>li</code>, <code>la</code>, <code>mv</code>, <code>nop</code>, <code>j</code>, <code>call</code>, <code>ret</code>, <code>beqz</code>, <code>bgt</code>, <code>fmv.s</code>, entre outras.</li>
+                            <li>Registradores numéricos (<code>x10</code>, <code>f2</code>) ou da ABI (<code>a0</code>, <code>ft2</code>); <code>x0</code> vale sempre zero.</li>
+                            <li>Rótulos, seções <code>.text</code> e <code>.data</code> e as diretivas <code>.word</code>, <code>.half</code>, <code>.byte</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code>, <code>.align</code>, <code>.string</code> e <code>.equ</code>. Os dados começam em <code>0x10000</code> e <code>sp</code> em <code>0x7fff0</code>.</li>
+                            <li>Valores iniciais de registradores em comentários: <code># a0 = 10</code> ou <code># f1 = 2.5</code>.</li>
+                            <li><code>ecall</code> e <code>ebreak</code> encerram o programa.</li>
+                        </ul>
+                        <h2>Controles</h2>
+                        <ul>
+                            <li><code>Seta direita</code> e <code>Seta esquerda</code>, ou os botões internos: avança ou volta um passo; com <code>Ctrl</code>, um ciclo.</li>
+                            <li><code>Home</code> e <code>End</code>, ou os botões das extremidades: início e fim da execução.</li>
+                            <li>Arraste o diagrama para mudar a posição e use a roda do mouse para ampliar; duplo clique restaura a posição.</li>
+                        </ul>
+                        <p>Código fonte: <a href="https://github.com/CSER-UFT/riscv-simulator-tomasulo">github.com/CSER-UFT/riscv-simulator-tomasulo</a>.</p>
+                    </div>
+                    <div lang="en">
+                        <h1>RISC-V Superscalar Simulator</h1>
+                        <p>An educational simulator of RISC-V processors, from single cycle to dynamic scheduling with <a href="https://en.wikipedia.org/wiki/Tomasulo%27s_algorithm">Tomasulo's algorithm</a>, developed for the <strong>Computer Science</strong> program at the <strong>Federal University of Tocantins</strong> (Brazil).</p>
+                        <p>Click <strong>New Simulation</strong>, pick an example or write a RISC-V assembly program, configure the processor and run it. Execution can be followed cycle by cycle, or step by step within each cycle, in the diagram and in the timeline.</p>
+                        <h2>Processor models</h2>
+                        <ul>
+                            <li><strong>Single cycle</strong>: one instruction per cycle, with the datapath and control signals highlighted at each step.</li>
+                            <li><strong>5-stage pipeline</strong>: IF, ID, EX, MEM and WB, with optional forwarding, branches resolved in EX or ID, branch prediction, multicycle EX operations and a data cache.</li>
+                            <li><strong>Classic Tomasulo</strong>: reservation stations, renaming by station name and CDB broadcast; no speculation.</li>
+                            <li><strong>Tomasulo with ROB</strong>: reorder buffer, in-order commit, speculation with branch prediction and recovery at commit or at execution.</li>
+                        </ul>
+                        <p>For Tomasulo you can configure station groups, functional units per group (pipelined or not), latencies, issue, CDB and commit widths, ROB size, store-to-load forwarding and the cache.</p>
+                        <h2>Classroom features</h2>
+                        <ul>
+                            <li><strong>Exercise</strong>: students fill in the cycle of each event of each instruction and the simulator grades it. A copied exercise link opens directly in exercise mode.</li>
+                            <li><strong>Compare</strong>: runs the same program with another configuration and shows both timelines and statistics side by side.</li>
+                            <li><strong>Export</strong>: timeline and event table as CSV and LaTeX (also blank, for exams).</li>
+                        </ul>
+                        <h2>Supported language</h2>
+                        <ul>
+                            <li><strong>RV32I and RV64I</strong>, <strong>M</strong>, <strong>F</strong> and <strong>D</strong> extensions (including <code>fmadd</code>, <code>fmsub</code>, <code>fnmadd</code> and <code>fnmsub</code>).</li>
+                            <li>Common pseudo instructions: <code>li</code>, <code>la</code>, <code>mv</code>, <code>nop</code>, <code>j</code>, <code>call</code>, <code>ret</code>, <code>beqz</code>, <code>bgt</code>, <code>fmv.s</code>, and more.</li>
+                            <li>Numeric (<code>x10</code>, <code>f2</code>) or ABI (<code>a0</code>, <code>ft2</code>) register names; <code>x0</code> is always zero.</li>
+                            <li>Labels, <code>.text</code> and <code>.data</code> sections and the <code>.word</code>, <code>.half</code>, <code>.byte</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code>, <code>.align</code>, <code>.string</code> and <code>.equ</code> directives. Data starts at <code>0x10000</code> and <code>sp</code> at <code>0x7fff0</code>.</li>
+                            <li>Initial register values in comments: <code># a0 = 10</code> or <code># f1 = 2.5</code>.</li>
+                            <li><code>ecall</code> and <code>ebreak</code> end the program.</li>
+                        </ul>
+                        <h2>Controls</h2>
+                        <ul>
+                            <li><code>Right arrow</code> and <code>Left arrow</code>, or the inner buttons: one step forward or back; with <code>Ctrl</code>, one cycle.</li>
+                            <li><code>Home</code> and <code>End</code>, or the outer buttons: start and end of the execution.</li>
+                            <li>Drag the diagram to move it and use the mouse wheel to zoom; double click resets the view.</li>
+                        </ul>
+                        <p>Source code: <a href="https://github.com/CSER-UFT/riscv-simulator-tomasulo">github.com/CSER-UFT/riscv-simulator-tomasulo</a>.</p>
+                    </div>
                 </div>
                 <div id="viewport">
                     <div id="diagram"></div>
                 </div>
+                <div id="sheet" class="hidden"></div>
                 <div id="control">
-                    <div id="control-skip-back" class="control-button control-div active" title="Ir para o início (Home)"><img src="./svg/skipBack.svg" alt="Início" /></div>
-                    <div id="control-step-back" class="control-button control-div active" title="Voltar um passo (seta esquerda); com Ctrl, voltar um ciclo"><img src="./svg/stepBack.svg" alt="Voltar passo" /></div>
+                    <div id="control-skip-back" class="control-button control-div active" data-i18n-title="ui.ctl.start"><img src="./svg/skipBack.svg" alt="" /></div>
+                    <div id="control-step-back" class="control-button control-div active" data-i18n-title="ui.ctl.back"><img src="./svg/stepBack.svg" alt="" /></div>
                     <div id="control-counter" class="control-div"></div>
-                    <div id="control-step-fwd" class="control-button control-div active" title="Avançar um passo (seta direita); com Ctrl, avançar um ciclo"><img src="./svg/stepFwd.svg" alt="Avançar passo" /></div>
-                    <div id="control-skip-fwd" class="control-button control-div active" title="Ir para o fim (End)"><img src="./svg/skipFwd.svg" alt="Fim" /></div>
+                    <div id="control-step-fwd" class="control-button control-div active" data-i18n-title="ui.ctl.fwd"><img src="./svg/stepFwd.svg" alt="" /></div>
+                    <div id="control-skip-fwd" class="control-button control-div active" data-i18n-title="ui.ctl.end"><img src="./svg/skipFwd.svg" alt="" /></div>
                     <div id="control-msg"></div>
                 </div>
             </div>
             <div id="tab-timeline">
-                <table id="timeline"></table>
+                <table id="timeline" class="timeline"></table>
             </div>
         </div>
 
         <div id="md-novo" class="modal screen">
             <div class="dialog wide">
-                <img id="close-novo" class="close button" src="./svg/close.svg" alt="Fechar" />
+                <img id="close-novo" class="close button" src="./svg/close.svg" alt="X" />
                 <h1>Nova Simulação</h1>
                 <div class="editor-layout">
                     <div class="editor-code">
-                        <label class="field">Exemplo:
+                        <label class="field"><span data-i18n="ed.example">Exemplo:</span>
                             <select id="novo-template"></select>
                         </label>
                         <div class="code-box">
                             <pre id="novo-gutter" aria-hidden="true"></pre>
-                            <textarea id="novo-code" spellcheck="false" wrap="off" aria-label="Código assembly"></textarea>
+                            <div class="code-area">
+                                <pre id="novo-highlight" aria-hidden="true"></pre>
+                                <textarea id="novo-code" spellcheck="false" wrap="off" aria-label="Assembly"></textarea>
+                            </div>
                         </div>
                         <ul id="novo-errors" class="errors"></ul>
                     </div>
                     <div class="editor-config" id="novo-config"></div>
                 </div>
                 <div class="dialog-actions">
-                    <span id="novo-reset" class="button">Restaurar configuração padrão</span>
+                    <span id="novo-reset" class="button" data-i18n="ed.reset">Restaurar configuração padrão</span>
                     <span id="novo-submit" class="button primary">Executar</span>
                 </div>
             </div>
