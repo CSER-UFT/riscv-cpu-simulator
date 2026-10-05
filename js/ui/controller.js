@@ -30,25 +30,43 @@ export class Controller extends EventTarget {
         // Recebe eventos de controle
         document.addEventListener('keydown', (e) => {
             const targetType = e.target.tagName.toLowerCase();
-            if (targetType === 'textarea')
+            if (['textarea', 'input', 'select'].includes(targetType) || document.querySelector('.modal.visible'))
+                return;
+            if (!this.main.classList.contains('visible'))
                 return;
 
-            if (e.ctrlKey) {
-                if (e.key === 'ArrowLeft')
-                    this.goBackCycle();
-                else if (e.key === 'ArrowRight')
-                    this.goFwdCycle();
-            } else {
-                if (e.key === 'ArrowLeft')
-                    this.goBackStep();
-                else if (e.key === 'ArrowRight')
-                    this.goFwdStep();
-            }
+            let handled = true;
+            if (e.key === 'Home')
+                this.goTo(0, 0);
+            else if (e.key === 'End')
+                this.goTo(this.numStates - 1, this.numInterStates[this.numStates - 1]);
+            else if (e.ctrlKey && e.key === 'ArrowLeft')
+                this.goBackCycle();
+            else if (e.ctrlKey && e.key === 'ArrowRight')
+                this.goFwdCycle();
+            else if (e.key === 'ArrowLeft')
+                this.goBackStep();
+            else if (e.key === 'ArrowRight')
+                this.goFwdStep();
+            else
+                handled = false;
+            if (handled)
+                e.preventDefault();
         });
         this.skipBack.addEventListener('click', this.goBackCycle.bind(this));
         this.skipFwd.addEventListener('click', this.goFwdCycle.bind(this));
         this.stepBack.addEventListener('click', this.goBackStep.bind(this));
         this.stepFwd.addEventListener('click', this.goFwdStep.bind(this));
+    }
+
+    /**
+     * Vai diretamente para um ciclo e passo.
+     */
+    goTo(state, interState) {
+        this.curState = state;
+        this.curInterState = interState;
+        this.redraw();
+        this.dispatchEvent(this.updateEvent);
     }
 
     /**
