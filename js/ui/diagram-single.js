@@ -4,7 +4,7 @@
  */
 import * as fmt from '../riscv/format.js';
 import { t } from '../i18n/index.js';
-import { esc, registersPanel, memoryPanel, statsPanel } from './panels.js';
+import { esc, registersPanel, memoryPanel, cachePanel, statsPanel } from './panels.js';
 
 const PHASES = ['IF', 'ID', 'EX', 'MEM', 'WB', 'PC'];
 
@@ -89,6 +89,6 @@ export function renderSingle(el, ctx, snap) {
                 <section class="panel ${focus.has('control') ? 'focus' : ''}"><h3>${t('ui.single.signals')}</h3>${cur ? `<table class="stats">${signals}</table>` : `<p class="note">${t('ui.single.idle')}</p>`}</section>
                 ${registersPanel(ctx, snap, focus)}
             </div>
-            <div class="single-side">${memoryPanel(ctx, snap, focus)}${statsPanel(ctx)}</div>
+            <div class="single-side">${memoryPanel(ctx, snap, focus)}${cachePanel(ctx, snap, focus)}${statsPanel(ctx)}</div>
         </div>`;
 }

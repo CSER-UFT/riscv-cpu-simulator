@@ -21,6 +21,18 @@ export const CONFIGS = {
         latency: { mul: 3, div: 6, fadd: 2, fmul: 3, fdiv: 5 },
     },
     'pipeline, desvio em ID, sem encaminhamento': { mode: 'pipeline', predictor: 'btfn', pipeline: { forwarding: false, branchStage: 'ID' } },
+    'pipeline com L1I, L1D, L2 e L3': {
+        mode: 'pipeline', predictor: '1bit',
+        memory: {
+            enabled: true, mainLatency: 12,
+            levels: {
+                L1I: { enabled: true, size: 32, blockSize: 8, assoc: 1, latency: 1 },
+                L1D: { enabled: true, size: 32, blockSize: 8, assoc: 2, latency: 1 },
+                L2: { enabled: true, size: 128, blockSize: 16, assoc: 2, latency: 3 },
+                L3: { enabled: true, size: 512, blockSize: 32, assoc: 4, latency: 6 },
+            },
+        },
+    },
     'clássico padrão': { mode: 'classic' },
     'clássico mínimo': {
         mode: 'classic',
@@ -64,6 +76,18 @@ export const CONFIGS = {
             { name: 'Int', count: 3, classes: ['alu', 'branch', 'jump', 'mul', 'div'], units: 2, pipelined: true },
             { name: 'FP', count: 3, classes: ['fadd', 'fmul', 'fdiv'], units: 1, pipelined: true },
         ],
+    },
+    'ROB com hierarquia completa': {
+        mode: 'rob', predictor: '2bit', issueWidth: 2, commitWidth: 2, storeForwarding: true,
+        memory: {
+            enabled: true, mainLatency: 15,
+            levels: {
+                L1I: { enabled: true, size: 64, blockSize: 16, assoc: 2, latency: 1 },
+                L1D: { enabled: true, size: 32, blockSize: 8, assoc: 1, latency: 1 },
+                L2: { enabled: true, size: 128, blockSize: 16, assoc: 4, latency: 4 },
+                L3: { enabled: true, size: 512, blockSize: 32, assoc: 8, latency: 8 },
+            },
+        },
     },
     'ROB BTFN, latências altas': {
         mode: 'rob', predictor: 'btfn', issueWidth: 2, commitWidth: 2,

@@ -74,17 +74,46 @@ export function memoryPanel(ctx, snap, focus) {
         ${ws.length ? `<table class="mem"><tr><th>${t('ui.address')}</th><th>${t('ui.label')}</th><th>${t('ui.integer')}</th><th>Float</th></tr>${rows}</table>` : ''}${more}${empty}</section>`;
 }
 
+/** Hierarquia de memória: um bloco por nível habilitado, com o conteúdo dos conjuntos e o último acesso. */
 export function cachePanel(ctx, snap, focus) {
-    const cfg = ctx.sim.config.cache;
-    if (!snap.cache) return '';
-    const rows = snap.cache.sets.map((ways, s) => `<tr><td class="num">${s}</td>${ways.map((l) =>
-        `<td class="num ${l.valid ? '' : 'dim'}">${l.valid ? `0x${l.tag.toString(16)}` : t('ui.invalid')}</td>`).join('')}</tr>`).join('');
-    const total = snap.cache.hits + snap.cache.misses;
-    const rate = total ? ((100 * snap.cache.hits) / total).toFixed(0) : '0';
-    return `<section class="panel ${focus.has('cache') ? 'focus' : ''}" data-part="cache">
-        <h3>${t('ui.cache')} <span class="sub">${t('ui.cacheInfo', { size: cfg.size, block: cfg.blockSize, assoc: cfg.assoc })}</span></h3>
-        <table class="cache"><tr><th>${t('ui.set')}</th>${Array.from({ length: cfg.assoc }, (_, w) => `<th>${t('ui.wayTag', { w })}</th>`).join('')}</tr>${rows}</table>
-        <p class="note">${t('ui.cacheStats', { hits: snap.cache.hits, misses: snap.cache.misses, rate })}</p></section>`;
+    const cfg = ctx.sim.config.memory;
+    const h = snap.cache;
+    if (!h) return '';
+    const last = h.last;
+    const levels = Object.entries(h.levels).map(([name, lv]) => {
+        const lc = cfg.levels[name];
+        const total = lv.hits + lv.misses;
+        const rate = total ? ((100 * lv.hits) / total).toFixed(0) : '0';
+        const inPath = last && last.path.includes(name);
+        const isHit = last && last.hitLevel === name;
+        const state = inPath ? (isHit ? 'hit' : 'miss') : '';
+        let rows = lv.sets.map((ways, i) => [i, ways]);
+        let note = '';
+        if (rows.length > 16) {
+            const valid = rows.filter(([, ways]) => ways.some((l) => l.valid));
+            note = `<p class="note">${t('ui.mem.validOnly', { shown: Math.min(valid.length, 16), total: rows.length })}</p>`;
+            rows = valid.slice(0, 16);
+        }
+        const body = rows.map(([i, ways]) => `<tr><td class="num">${i}</td>${ways.map((l) =>
+            `<td class="num ${l.valid ? '' : 'dim'}">${l.valid ? `0x${l.tag.toString(16)}` : '·'}</td>`).join('')}</tr>`).join('');
+        return `<div class="level ${state}">
+            <div class="level-head"><b>${name}</b><span class="sub">${t('ui.mem.levelInfo', { size: lc.size, block: lc.blockSize, assoc: lc.assoc, lat: lc.latency })}</span>
+                ${state ? `<span class="badge ${state}">${t(state === 'hit' ? 'ui.mem.hit' : 'ui.mem.miss')}</span>` : ''}</div>
+            <p class="note">${t('ui.cacheStats', { hits: lv.hits, misses: lv.misses, rate })}</p>
+            <table class="cache"><tr><th>${t('ui.set')}</th>${Array.from({ length: lc.assoc }, (_, w) => `<th>${t('ui.wayTag', { w })}</th>`).join('')}</tr>${body}</table>${note}
+        </div>`;
+    }).join('');
+    const mainHit = last && last.hitLevel === 'MEM';
+    const lastText = last
+        ? t('ui.mem.last', { kind: t(last.kind === 'inst' ? 'ui.mem.inst' : 'ui.mem.data'), addr: fmt.address(BigInt(last.addr)), level: last.hitLevel === 'MEM' ? t('mem.main') : last.hitLevel, n: last.latency })
+        : t('ui.mem.none');
+    return `<section class="panel hierarchy ${focus.has('cache') ? 'focus' : ''}" data-part="cache">
+        <h3>${t('ui.mem.title')}</h3>
+        <p class="note">${esc(lastText)}</p>
+        ${levels}
+        <div class="level ${mainHit ? 'miss' : ''}"><div class="level-head"><b>${t('ui.mem.mainShort')}</b><span class="sub">${t('ui.mem.mainInfo', { lat: cfg.mainLatency, n: h.mainAccesses })}</span>
+            ${mainHit ? `<span class="badge hit">${t('ui.mem.served')}</span>` : ''}</div></div>
+    </section>`;
 }
 
 export function predictorPanel(ctx, snap) {
@@ -131,9 +160,13 @@ export function statsRows(sim) {
         add('stats.loads', s.loads);
         add('stats.stores', s.stores);
     }
-    if (s.cacheHits !== undefined) {
-        add('stats.cacheHits', s.cacheHits);
-        add('stats.cacheMisses', s.cacheMisses);
+    if (s.memory) {
+        for (const [name, l] of Object.entries(s.memory.levels)) {
+            const total = l.hits + l.misses;
+            rows.push([t('stats.levelRate', { level: name }), total ? `${((100 * l.hits) / total).toFixed(1)}% (${l.hits}/${total})` : '-']);
+        }
+        if (s.memory.amatData) rows.push([t('stats.amatData'), s.memory.amatData.toFixed(2)]);
+        if (s.memory.amatInst) rows.push([t('stats.amatInst'), s.memory.amatInst.toFixed(2)]);
     }
     return rows;
 }

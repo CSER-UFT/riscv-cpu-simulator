@@ -7,6 +7,7 @@ import * as memory from '../riscv/memory.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
+import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
 import { t } from '../i18n/index.js';
 import { normalizeConfig } from '../tomasulo/config.js';
 import { Recorder } from '../tomasulo/recorder.js';
@@ -33,14 +34,23 @@ export function simulateSingle(program, userConfig = {}) {
     const xlen = program.xlen;
     const arch = initialState(program, { exampleValues: cfg.exampleValues });
 
-    const S = { cycle: 0, pc: TEXT_BASE, halted: false, regs: { x: arch.x, f: arch.f }, mem: arch.mem, cur: null, phase: null };
+    const S = { cycle: 0, pc: TEXT_BASE, halted: false, regs: { x: arch.x, f: arch.f }, mem: arch.mem, cur: null, phase: null, cache: createHierarchy(cfg.memory) };
     const dyn = [];
     const warnings = [];
     const stats = { instructions: 0, branches: 0, takenBranches: 0, loads: 0, stores: 0 };
 
     const rec = new Recorder(userConfig.trace !== false, () => ({
-        cycle: S.cycle, pc: S.pc, halted: S.halted, regs: S.regs, cur: S.cur, phase: S.phase,
+        cycle: S.cycle, pc: S.pc, halted: S.halted, regs: S.regs, cur: S.cur, phase: S.phase, cache: S.cache,
     }), () => S.mem);
+
+    // No monociclo a hierarquia de memória não altera o tempo (CPI = 1): só registra acertos e falhas.
+    const memNote = (kind, addr) => {
+        if (!S.cache || (kind === 'inst' && !cfg.memory.levels.L1I.enabled)) return '';
+        const r = hierAccess(S.cache, cfg.memory, kind, addr);
+        const parts = r.path.map((p) => t(p.hit ? 'mem.hitAt' : 'mem.missAt', { level: p.level }));
+        if (r.hitLevel === 'MEM') parts.push(t('mem.main'));
+        return ' ' + t('mem.pathNoTime', { path: parts.join(', ') });
+    };
     const step = (phase, msg, focus = []) => {
         S.phase = phase;
         rec.step(msg, focus);
@@ -71,7 +81,7 @@ export function simulateSingle(program, userConfig = {}) {
             result: null, addr: null, memValue: null, dest: inst.rd, wb: null, next: inst.pc + 4, taken: null,
         };
         S.cur = cur;
-        step('IF', t('single.fetch', { addr: A(inst.pc), inst: code }), ['pc', 'imem']);
+        step('IF', t('single.fetch', { addr: A(inst.pc), inst: code }) + memNote('inst', inst.pc), ['pc', 'imem']);
 
         cur.a = readReg(S.regs, inst.rs1);
         cur.b = readReg(S.regs, inst.rs2);
@@ -90,12 +100,12 @@ export function simulateSingle(program, userConfig = {}) {
                 stats.loads++;
                 cur.memValue = memory.load(S.mem, cur.addr, d.mem, xlen);
                 cur.result = cur.memValue;
-                step('MEM', t('single.load', { addr: A(cur.addr), value: V(cur.memValue) }), ['dmem', `mem:${cur.addr}`]);
+                step('MEM', t('single.load', { addr: A(cur.addr), value: V(cur.memValue) }) + memNote('data', cur.addr), ['dmem', `mem:${cur.addr}`]);
             } else {
                 stats.stores++;
                 S.mem = new Map(S.mem);
                 memory.store(S.mem, cur.addr, d.mem, cur.b);
-                step('MEM', t('single.store', { addr: A(cur.addr), value: V(cur.b) }), ['dmem', `mem:${cur.addr}`]);
+                step('MEM', t('single.store', { addr: A(cur.addr), value: V(cur.b) }) + memNote('data', cur.addr), ['dmem', `mem:${cur.addr}`]);
             }
         } else if (d.cls === 'branch' || d.cls === 'jump') {
             const r = resolveControl(inst, cur.a, cur.b, xlen);
@@ -135,7 +145,10 @@ export function simulateSingle(program, userConfig = {}) {
         dyn,
         warnings,
         finished: S.halted || indexAt(program, S.pc) < 0,
-        stats: { ...stats, cycles: S.cycle, ipc: S.cycle > 0 ? stats.instructions / S.cycle : 0, cpi: 1 },
+        stats: {
+            ...stats, cycles: S.cycle, ipc: S.cycle > 0 ? stats.instructions / S.cycle : 0, cpi: 1,
+            ...(S.cache ? { memory: hierarchyStats(S.cache) } : {}),
+        },
         final: { x: S.regs.x, f: S.regs.f, mem: S.mem },
     };
 }

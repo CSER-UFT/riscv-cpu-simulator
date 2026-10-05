@@ -219,4 +219,42 @@ laco:
     bnez   a2, laco
 `,
     },
+    {
+        id: 'cache',
+        name: 'Hierarquia de memória (L1, L2, L3)',
+        nameEn: 'Memory hierarchy (L1, L2, L3)',
+        config: {
+            mode: 'pipeline',
+            memory: {
+                enabled: true,
+                mainLatency: 40,
+                levels: {
+                    L1I: { enabled: true, size: 64, blockSize: 16, assoc: 2, latency: 1 },
+                    L1D: { enabled: true, size: 64, blockSize: 16, assoc: 1, latency: 1 },
+                    L2: { enabled: true, size: 256, blockSize: 32, assoc: 2, latency: 6 },
+                    L3: { enabled: true, size: 1024, blockSize: 64, assoc: 4, latency: 15 },
+                },
+            },
+        },
+        code: `# Percorre um vetor duas vezes. Na primeira passada os blocos vêm da memória
+# principal; na segunda, o que não coube na L1D é encontrado na L2.
+.data
+v:  .word 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+    .word 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+.text
+    li    s0, 2           # passadas
+    li    t2, 0           # soma
+passada:
+    la    a0, v
+    li    a1, 32
+laco:
+    lw    t0, 0(a0)
+    add   t2, t2, t0
+    addi  a0, a0, 4
+    addi  a1, a1, -1
+    bnez  a1, laco
+    addi  s0, s0, -1
+    bnez  s0, passada
+`,
+    },
 ];

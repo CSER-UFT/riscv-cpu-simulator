@@ -18,7 +18,7 @@ export function configSummary(cfg) {
             const units = g.units === null ? t('summary.unitPerStation') : t(g.pipelined ? 'summary.unitsPipelined' : 'summary.unitsBlocking', { n: g.units });
             items.push(t('summary.group', { name: g.name, n: g.count, classes: g.classes.map(className).join(', '), units }));
         }
-        items.push(`${t('summary.latencies')}: ${t('latency.address')}: ${cfg.latency.address}, ${cfg.cache.enabled ? '' : `${t('latency.load')}: ${cfg.latency.load}, `}${lat(['alu', 'branch', 'mul', 'div', 'fadd', 'fmul', 'fdiv'])}`);
+        items.push(`${t('summary.latencies')}: ${t('latency.address')}: ${cfg.latency.address}, ${cfg.memory.enabled ? '' : `${t('latency.load')}: ${cfg.latency.load}, `}${lat(['alu', 'branch', 'mul', 'div', 'fadd', 'fmul', 'fdiv'])}`);
         if (cfg.storeForwarding) items.push(t('summary.storeForwarding'));
         if (cfg.mode === 'rob') {
             items.push(t('summary.rob', { size: cfg.robSize, commit: cfg.commitWidth }));
@@ -26,8 +26,11 @@ export function configSummary(cfg) {
             items.push(t(cfg.recovery === 'write' ? 'summary.recoveryWrite' : 'summary.recoveryCommit'));
         }
     }
-    if (cfg.cache.enabled && cfg.mode !== 'single')
-        items.push(t('summary.cache', { size: cfg.cache.size, block: cfg.cache.blockSize, assoc: cfg.cache.assoc, hit: cfg.cache.hitLatency, miss: cfg.cache.missLatency }));
+    if (cfg.memory.enabled) {
+        for (const [name, l] of Object.entries(cfg.memory.levels))
+            if (l.enabled) items.push(t('summary.level', { name, size: l.size, block: l.blockSize, assoc: l.assoc, lat: l.latency }));
+        items.push(t('summary.main', { lat: cfg.memory.mainLatency }));
+    }
     return items;
 }
 

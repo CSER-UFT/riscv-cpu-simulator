@@ -21,7 +21,7 @@
  * No modo ROB os stores escrevem na memória apenas no commit.
  */
 import * as memory from '../riscv/memory.js';
-import { createCache, access as cacheAccess } from '../riscv/cache.js';
+import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
@@ -65,7 +65,7 @@ export function simulate(program, userConfig = {}) {
         mem: arch.mem,
         cdb: [],
         bht: new Array(cfg.bhtEntries).fill(cfg.predictor === '2bit' ? 1 : 0),
-        cache: cfg.cache.enabled ? createCache(cfg.cache) : null,
+        cache: createHierarchy(cfg.memory),
         units: {},
     };
 
@@ -149,10 +149,30 @@ export function simulate(program, userConfig = {}) {
         if (cfg.predictor === '2bit') S.bht[idx] = Math.max(0, Math.min(3, S.bht[idx] + (wasTaken ? 1 : -1)));
     }
 
+    /** Descrição do caminho de um acesso na hierarquia, por exemplo "L1D falha, L2 acerto: 7 ciclos". */
+    function describeAccess(r) {
+        const parts = r.path.map((p) => t(p.hit ? 'mem.hitAt' : 'mem.missAt', { level: p.level }));
+        if (r.hitLevel === 'MEM') parts.push(t('mem.main'));
+        return t('mem.path', { path: parts.join(', '), n: r.latency });
+    }
+
+    /** Latência de um acesso de dados: pela hierarquia, se habilitada, ou a latência fixa indicada. */
     function cacheLatency(addr, fallback) {
         if (!S.cache) return { latency: fallback, info: '' };
-        const r = cacheAccess(S.cache, cfg.cache, addr);
-        return { latency: r.latency, info: t(r.hit ? 'common.cacheHit' : 'common.cacheMiss', { set: r.set }) };
+        const r = hierAccess(S.cache, cfg.memory, 'data', addr);
+        return { latency: r.latency, info: describeAccess(r) };
+    }
+
+    /** Busca da instrução em PC pela cache de instruções; retorna verdadeiro quando ela está disponível. */
+    function fetchReady(pc) {
+        if (!S.cache || !cfg.memory.levels.L1I.enabled) return true;
+        if (S.fetch.fetchedPc === pc) return S.cycle >= S.fetch.fetchReadyAt;
+        const r = hierAccess(S.cache, cfg.memory, 'inst', pc);
+        S.fetch.fetchedPc = pc;
+        S.fetch.fetchReadyAt = S.cycle + r.latency - 1;
+        if (r.latency > 1)
+            step(t('tom.fetchMiss', { addr: A(pc), info: describeAccess(r) }), ['pc', 'cache']);
+        return S.cycle >= S.fetch.fetchReadyAt;
     }
 
     // 1. Commit ---------------------------------------------------------------------------------------------
@@ -761,6 +781,7 @@ export function simulate(program, userConfig = {}) {
             if (S.fetch.resumeAt > S.cycle) return;
             const i = indexAt(program, S.pc);
             if (i < 0) return;
+            if (!fetchReady(S.pc)) return;
             if (!issueOne(program.instructions[i])) return;
         }
     }
@@ -788,10 +809,7 @@ export function simulate(program, userConfig = {}) {
     }
 
     const committed = speculative ? stats.committed : stats.issued;
-    if (S.cache) {
-        stats.cacheHits = S.cache.hits;
-        stats.cacheMisses = S.cache.misses;
-    }
+    if (S.cache) stats.memory = hierarchyStats(S.cache);
     return {
         errors: [],
         model: cfg.mode,

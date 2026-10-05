@@ -30,7 +30,16 @@ export const DEFAULT_CONFIG = {
     storeForwarding: false,
     recovery: 'commit',
     pipeline: { forwarding: true, branchStage: 'EX' },
-    cache: { enabled: false, size: 256, blockSize: 16, assoc: 1, hitLatency: 1, missLatency: 10 },
+    memory: {
+        enabled: false,
+        mainLatency: 40,
+        levels: {
+            L1I: { enabled: true, size: 256, blockSize: 16, assoc: 2, latency: 1 },
+            L1D: { enabled: true, size: 256, blockSize: 16, assoc: 2, latency: 1 },
+            L2: { enabled: true, size: 1024, blockSize: 32, assoc: 4, latency: 6 },
+            L3: { enabled: false, size: 4096, blockSize: 64, assoc: 8, latency: 20 },
+        },
+    },
     groups: [
         { name: 'Load', count: 3, classes: ['load', 'store'], units: 0, pipelined: true },
         { name: 'Add', count: 3, classes: ['alu', 'branch', 'jump', 'fadd'], units: 0, pipelined: true },
@@ -51,13 +60,48 @@ const bool = (v, def) => (v === undefined ? def : Boolean(v));
 const isPow2 = (n) => n > 0 && (n & (n - 1)) === 0;
 
 /**
+ * Normaliza a hierarquia de memória. Aceita também o formato antigo, de uma única cache de dados
+ * ({cache: {enabled, size, blockSize, assoc, hitLatency, missLatency}}), convertido em L1D mais memória.
+ */
+function normalizeMemory(partial) {
+    const d = DEFAULT_CONFIG.memory;
+    let pm = partial.memory;
+    if (!pm && partial.cache) {
+        const c = partial.cache;
+        const hit = intIn(c.hitLatency, 1, 100, 1);
+        pm = {
+            enabled: Boolean(c.enabled),
+            mainLatency: Math.max(1, intIn(c.missLatency, 1, 1000, 10) - hit),
+            levels: {
+                L1I: { enabled: false },
+                L1D: { enabled: true, size: c.size, blockSize: c.blockSize, assoc: c.assoc, latency: hit },
+                L2: { enabled: false },
+                L3: { enabled: false },
+            },
+        };
+    }
+    pm ??= {};
+    const levels = {};
+    for (const [name, dl] of Object.entries(d.levels)) {
+        const l = pm.levels?.[name] ?? {};
+        levels[name] = {
+            enabled: bool(l.enabled, dl.enabled),
+            size: intIn(l.size, 4, 1 << 24, dl.size),
+            blockSize: intIn(l.blockSize, 1, 4096, dl.blockSize),
+            assoc: intIn(l.assoc, 1, 64, dl.assoc),
+            latency: intIn(l.latency, 1, 1000, dl.latency),
+        };
+    }
+    return { enabled: bool(pm.enabled, d.enabled), mainLatency: intIn(pm.mainLatency, 1, 10000, d.mainLatency), levels };
+}
+
+/**
  * Completa uma configuração parcial com os valores padrão e normaliza os campos.
  * @returns {{config: object, errors: string[]}}
  */
 export function normalizeConfig(partial = {}) {
     const d = DEFAULT_CONFIG;
     const errors = [];
-    const pc = partial.cache ?? {};
     const pp = partial.pipeline ?? {};
     const c = {
         mode: MODE_IDS.includes(partial.mode) ? partial.mode : d.mode,
@@ -77,25 +121,21 @@ export function normalizeConfig(partial = {}) {
             forwarding: bool(pp.forwarding, d.pipeline.forwarding),
             branchStage: pp.branchStage === 'ID' ? 'ID' : 'EX',
         },
-        cache: {
-            enabled: bool(pc.enabled, d.cache.enabled),
-            size: intIn(pc.size, 4, 1 << 20, d.cache.size),
-            blockSize: intIn(pc.blockSize, 1, 1024, d.cache.blockSize),
-            assoc: intIn(pc.assoc, 1, 64, d.cache.assoc),
-            hitLatency: intIn(pc.hitLatency, 1, 100, d.cache.hitLatency),
-            missLatency: intIn(pc.missLatency, 1, 1000, d.cache.missLatency),
-        },
+        memory: normalizeMemory(partial),
         latency: {},
         groups: [],
     };
     for (const k of LATENCY_IDS)
         c.latency[k] = intIn(partial.latency?.[k], 1, 100, d.latency[k]);
 
-    if (c.cache.enabled) {
-        if (!isPow2(c.cache.blockSize) || !isPow2(c.cache.size) || !isPow2(c.cache.assoc))
-            errors.push(t('config.cachePow2'));
-        else if (c.cache.blockSize * c.cache.assoc > c.cache.size)
-            errors.push(t('config.cacheSmall'));
+    if (c.memory.enabled) {
+        for (const [name, l] of Object.entries(c.memory.levels)) {
+            if (!l.enabled) continue;
+            if (!isPow2(l.blockSize) || !isPow2(l.size) || !isPow2(l.assoc))
+                errors.push(t('config.cachePow2', { level: name }));
+            else if (l.blockSize * l.assoc > l.size)
+                errors.push(t('config.cacheSmall', { level: name }));
+        }
     }
 
     const names = new Set();

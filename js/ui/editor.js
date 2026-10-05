@@ -4,7 +4,7 @@
  */
 import { EXAMPLES, exampleName } from '../examples.js';
 import { t } from '../i18n/index.js';
-import { DEFAULT_CONFIG, MODE_IDS, PREDICTOR_IDS, LATENCY_IDS, STATION_CLASSES, className } from '../tomasulo/config.js';
+import { DEFAULT_CONFIG, MODE_IDS, PREDICTOR_IDS, LATENCY_IDS, STATION_CLASSES, className, normalizeConfig } from '../tomasulo/config.js';
 import { highlight } from './highlight.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c]);
@@ -179,7 +179,7 @@ export class Editor {
     setConfig(config) {
         const c = { ...clone(DEFAULT_CONFIG), ...clone(config) };
         c.latency = { ...DEFAULT_CONFIG.latency, ...(config.latency ?? {}) };
-        c.cache = { ...DEFAULT_CONFIG.cache, ...(config.cache ?? {}) };
+        c.memory = normalizeConfig(config).config.memory;
         c.pipeline = { ...DEFAULT_CONFIG.pipeline, ...(config.pipeline ?? {}) };
         const opt = (pairs, cur) => pairs.map(([k, v]) => `<option value="${k}" ${String(k) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
         const num = (name, value, min, max, label, cls = '') =>
@@ -214,14 +214,19 @@ export class Editor {
                 <p class="note">${t('ed.unitsHelp')}</p>
             </fieldset>
             <fieldset class="not-single"><legend>${t('ed.latencies')}</legend><div class="latencies">${lat}</div></fieldset>
-            <fieldset class="not-single"><legend>${t('ed.cache')}</legend>
-                ${check('cacheEnabled', c.cache.enabled, t('ed.cacheEnabled'))}
-                <div class="latencies cache-fields">
-                    ${num('cacheSize', c.cache.size, 4, 1 << 20, t('ed.cacheSize'), 'small')}
-                    ${num('cacheBlock', c.cache.blockSize, 1, 1024, t('ed.cacheBlock'), 'small')}
-                    ${num('cacheAssoc', c.cache.assoc, 1, 64, t('ed.cacheAssoc'), 'small')}
-                    ${num('cacheHit', c.cache.hitLatency, 1, 100, t('ed.cacheHit'), 'small')}
-                    ${num('cacheMiss', c.cache.missLatency, 1, 1000, t('ed.cacheMiss'), 'small')}
+            <fieldset><legend>${t('ed.memory')}</legend>
+                ${check('memEnabled', c.memory.enabled, t('ed.memoryEnabled'))}
+                <div class="mem-fields">
+                    ${num('mainLatency', c.memory.mainLatency, 1, 10000, t('ed.mainLatency'))}
+                    <table class="groups levels"><tr><th>${t('ed.level')}</th><th>${t('ed.levelOn')}</th><th>${t('ed.size')}</th><th>${t('ed.block')}</th><th>${t('ed.assoc')}</th><th>${t('ed.latency')}</th></tr>
+                    ${Object.entries(c.memory.levels).map(([name, l]) => `<tr data-level="${name}"><td><b>${name}</b></td>
+                        <td><input type="checkbox" name="lv-on" ${l.enabled ? 'checked' : ''} aria-label="${name}" /></td>
+                        <td><input type="number" name="lv-size" value="${l.size}" min="4" /></td>
+                        <td><input type="number" name="lv-block" value="${l.blockSize}" min="1" /></td>
+                        <td><input type="number" name="lv-assoc" value="${l.assoc}" min="1" max="64" /></td>
+                        <td><input type="number" name="lv-lat" value="${l.latency}" min="1" /></td></tr>`).join('')}
+                    </table>
+                    <p class="note">${t('ed.memoryHelp')}</p>
                 </div>
             </fieldset>
             <fieldset><legend>${t('ed.simulation')}</legend>
@@ -236,7 +241,7 @@ export class Editor {
             this.bindGroupRows();
         });
         this.configEl.querySelector('select[name="mode"]').addEventListener('change', () => this.updateModeFields());
-        this.configEl.querySelector('[name="cacheEnabled"]').addEventListener('change', () => this.updateModeFields());
+        this.configEl.querySelector('[name="memEnabled"]').addEventListener('change', () => this.updateModeFields());
         this.bindGroupRows();
         this.updateModeFields();
     }
@@ -270,8 +275,8 @@ export class Editor {
         for (const [cls, visible] of Object.entries(show))
             for (const el of this.configEl.querySelectorAll(`.${cls}`))
                 el.classList.toggle('hidden', !visible);
-        const cacheOn = this.configEl.querySelector('[name="cacheEnabled"]').checked;
-        this.configEl.querySelector('.cache-fields').classList.toggle('hidden', !cacheOn);
+        const memOn = this.configEl.querySelector('[name="memEnabled"]').checked;
+        this.configEl.querySelector('.mem-fields').classList.toggle('hidden', !memOn);
     }
 
     readConfig() {
@@ -293,9 +298,16 @@ export class Editor {
             storeForwarding: get('storeForwarding').checked,
             recovery: get('recovery').value,
             pipeline: { forwarding: get('pipeForwarding').checked, branchStage: get('branchStage').value },
-            cache: {
-                enabled: get('cacheEnabled').checked, size: n('cacheSize'), blockSize: n('cacheBlock'), assoc: n('cacheAssoc'),
-                hitLatency: n('cacheHit'), missLatency: n('cacheMiss'),
+            memory: {
+                enabled: get('memEnabled').checked,
+                mainLatency: n('mainLatency'),
+                levels: Object.fromEntries([...this.configEl.querySelectorAll('tr[data-level]')].map((row) => [row.dataset.level, {
+                    enabled: row.querySelector('[name="lv-on"]').checked,
+                    size: Number(row.querySelector('[name="lv-size"]').value),
+                    blockSize: Number(row.querySelector('[name="lv-block"]').value),
+                    assoc: Number(row.querySelector('[name="lv-assoc"]').value),
+                    latency: Number(row.querySelector('[name="lv-lat"]').value),
+                }])),
             },
             latency: {},
             groups: [],

@@ -322,8 +322,8 @@ test('recuperação de previsão errada na execução é mais rápida que no com
 test('cache: falha no primeiro acesso ao bloco, acerto nos seguintes', () => {
     const src = '.data\nv: .word 1, 2, 3, 4\n.text\nla a0, v\nlw a1, 0(a0)\nlw a2, 4(a0)\nlw a3, 64(a0)';
     const sim = simulate(asm(src), { cache: { enabled: true, size: 64, blockSize: 16, assoc: 1, hitLatency: 1, missLatency: 8 } });
-    assert.equal(sim.stats.cacheMisses, 2);
-    assert.equal(sim.stats.cacheHits, 1);
+    assert.equal(sim.stats.memory.levels.L1D.misses, 2);
+    assert.equal(sim.stats.memory.levels.L1D.hits, 1);
     const memCycles = (i) => sim.dyn[i].marks.filter((m) => m[1] === 'Mem').length;
     assert.equal(memCycles(2), 8);
     assert.equal(memCycles(3), 1);
@@ -392,4 +392,51 @@ test('monociclo: CPI igual a 1', () => {
     assert.equal(sim.stats.cycles, sim.stats.instructions);
     for (let c = 1; c < sim.states.length; c++)
         assert.ok(sim.interStates[c].length >= 3, 'cada ciclo é explicado em passos');
+});
+
+// Hierarquia de memória -------------------------------------------------------------------------------------
+
+const HIER = (over = {}) => ({
+    enabled: true,
+    mainLatency: 30,
+    levels: {
+        L1I: { enabled: false },
+        L1D: { enabled: true, size: 32, blockSize: 16, assoc: 1, latency: 1 },
+        L2: { enabled: true, size: 128, blockSize: 16, assoc: 2, latency: 5 },
+        L3: { enabled: true, size: 512, blockSize: 16, assoc: 4, latency: 12 },
+        ...over,
+    },
+});
+
+test('hierarquia: latência soma os níveis consultados até o acerto', () => {
+    // L1D tem 2 conjuntos de 16 bytes: 0x10000 e 0x10020 disputam o mesmo conjunto.
+    const src = '.data\nv: .space 64\n.text\nla a0, v\nlw t0, 0(a0)\nlw t1, 0(a0)\nlw t2, 32(a0)\nlw t3, 0(a0)';
+    const sim = simulate(asm(src), { mode: 'pipeline', memory: HIER() });
+    const mem = (i) => sim.dyn[i].marks.filter((m) => m[1] === 'MEM').length;
+    assert.equal(mem(2), 1 + 5 + 12 + 30, 'primeiro acesso: falha em todos os níveis');
+    assert.equal(mem(3), 1, 'mesmo bloco: acerto na L1D');
+    assert.equal(mem(4), 1 + 5 + 12 + 30, 'outro bloco: falha em todos');
+    assert.equal(mem(5), 1 + 5, 'bloco expulso da L1D, mas ainda na L2 (preenchimento inclusivo)');
+    const st = sim.stats.memory.levels;
+    assert.deepEqual([st.L1D.hits, st.L1D.misses, st.L2.hits, st.L2.misses, st.L3.misses], [1, 3, 1, 2, 2]);
+});
+
+test('hierarquia: cache de instruções atrasa a busca no pipeline e no Tomasulo', () => {
+    const src = 'addi a0, zero, 1\naddi a1, zero, 2\naddi a2, zero, 3\naddi a3, zero, 4\naddi a4, zero, 5';
+    const memory = HIER({ L1I: { enabled: true, size: 64, blockSize: 16, assoc: 1, latency: 1 }, L3: { enabled: false } });
+    for (const mode of ['pipeline', 'classic', 'rob']) {
+        const ideal = simulate(asm(src), { mode });
+        const cached = assertMatchesReference(asm(src), { mode, memory }, mode);
+        // Bloco de 16 bytes = 4 instruções: uma falha no início e outra na quinta instrução.
+        assert.equal(cached.stats.memory.levels.L1I.misses, 2, mode);
+        assert.ok(cached.stats.cycles >= ideal.stats.cycles + 2 * (5 + 30) - 2, `${mode}: ${cached.stats.cycles} x ${ideal.stats.cycles}`);
+    }
+});
+
+test('hierarquia: monociclo só registra estatísticas', () => {
+    const src = 'lw t0, 0(sp)\nlw t1, 0(sp)';
+    const sim = simulate(asm(src), { mode: 'single', memory: HIER() });
+    assert.equal(sim.stats.cycles, 2);
+    assert.equal(sim.stats.memory.levels.L1D.misses, 1);
+    assert.equal(sim.stats.memory.levels.L1D.hits, 1);
 });

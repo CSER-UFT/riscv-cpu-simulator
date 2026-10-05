@@ -7,11 +7,15 @@ O simulador roda inteiramente no navegador (HTML e JavaScript, sem dependências
 ## Modelos de processador
 
 * **Monociclo**: cada instrução em um ciclo, com o caminho de dados desenhado e os blocos, ligações, valores e sinais de controle destacados a cada passo (busca, decodificação, execução, memória, escrita e atualização do PC).
-* **Pipeline de 5 estágios** (IF, ID, EX, MEM, WB): encaminhamento opcional (EX/MEM e MEM/WB), detecção de hazards com bolhas, desvios resolvidos em EX ou em ID, previsão de desvios, operações de várias etapas no EX (multiplicação, divisão, ponto flutuante) e cache de dados no MEM.
+* **Pipeline de 5 estágios** (IF, ID, EX, MEM, WB): encaminhamento opcional (EX/MEM e MEM/WB), detecção de hazards com bolhas, desvios resolvidos em EX ou em ID, previsão de desvios, operações de várias etapas no EX (multiplicação, divisão, ponto flutuante) e hierarquia de memória no IF e no MEM.
 * **Tomasulo clássico**: estações de reserva, renomeação pelo nome da estação e difusão pelo CDB; sem especulação.
 * **Tomasulo com ROB**: buffer de reordenação, commit em ordem, especulação com previsão de desvios e correção da previsão errada no commit ou já na resolução do desvio.
 
-No Tomasulo são configuráveis os grupos de estações (nome, quantidade e classes de instrução aceitas), as unidades funcionais de cada grupo (uma por estação, ou um número compartilhado, com ou sem pipeline), as latências, as larguras de emissão, de CDB e de commit, o tamanho do ROB, o preditor, o encaminhamento de store para load e a cache de dados (tamanho, bloco, associatividade e latências de acerto e falha).
+No Tomasulo são configuráveis os grupos de estações (nome, quantidade e classes de instrução aceitas), as unidades funcionais de cada grupo (uma por estação, ou um número compartilhado, com ou sem pipeline), as latências, as larguras de emissão, de CDB e de commit, o tamanho do ROB, o preditor e o encaminhamento de store para load.
+
+## Hierarquia de memória
+
+O pipeline e o Tomasulo podem usar uma hierarquia com L1 de instruções (L1I), L1 de dados (L1D), L2 e L3 compartilhadas e memória principal. Cada nível pode ser ligado ou desligado e tem tamanho, bloco, associatividade e latência de acesso configuráveis, com substituição LRU, alocação na escrita e preenchimento inclusivo (o bloco é colocado em todos os níveis por onde o acesso passou). A latência de um acesso é a soma das latências dos níveis consultados até o acerto, mais a da memória principal se todos falharem; sem L1I, a busca de instruções é ideal. O painel mostra o conteúdo de cada nível, o último acesso e as taxas de acerto, e as estatísticas incluem o tempo médio de acesso. No monociclo, que tem CPI 1 por definição, a hierarquia só gera estatísticas. Configurações antigas com uma única cache de dados continuam aceitas.
 
 ## Recursos para aula
 
@@ -59,7 +63,7 @@ js/riscv/isa.js          tabela declarativa das instruções (formato, classe, r
 js/riscv/parser.js       montador: rótulos, pseudoinstruções, diretivas, erros por linha
 js/riscv/machine.js      estado inicial e simulador funcional de referência (sequencial)
 js/riscv/memory.js       memória esparsa endereçável por byte
-js/riscv/cache.js        cache de dados para temporização
+js/riscv/hierarchy.js    hierarquia de memória (L1I, L1D, L2, L3) para temporização
 js/simulator.js          escolhe o modelo de processador
 js/models/single.js      monociclo
 js/models/pipeline.js    pipeline de 5 estágios
@@ -82,7 +86,7 @@ Requer Node.js 20 ou mais recente, sem dependências.
 npm test
 ```
 
-A suíte verifica o montador, a semântica das instruções, os dicionários de tradução e o comportamento temporal de cada modelo (dependências RAW, WAR e WAW, encaminhamento, bolhas, penalidades de desvio, conflitos estruturais, de CDB e de unidade funcional, especulação, commit em ordem, encaminhamento de store para load e cache). O teste principal compara o estado final de cada modelo com o do simulador funcional de referência para programas escritos à mão e para programas gerados aleatoriamente, em quinze configurações de hardware diferentes. A quantidade de programas aleatórios pode ser alterada com a variável `RANDOM_PROGRAMS`.
+A suíte verifica o montador, a semântica das instruções, os dicionários de tradução e o comportamento temporal de cada modelo (dependências RAW, WAR e WAW, encaminhamento, bolhas, penalidades de desvio, conflitos estruturais, de CDB e de unidade funcional, especulação, commit em ordem, encaminhamento de store para load e hierarquia de memória). O teste principal compara o estado final de cada modelo com o do simulador funcional de referência para programas escritos à mão e para programas gerados aleatoriamente, em dezessete configurações de hardware diferentes. A quantidade de programas aleatórios pode ser alterada com a variável `RANDOM_PROGRAMS`.
 
 ## Execução local
 

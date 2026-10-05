@@ -11,7 +11,7 @@
  * As decisões de avanço são tomadas ao fim de cada ciclo, a partir do estado de todos os estágios.
  */
 import * as memory from '../riscv/memory.js';
-import { createCache, access as cacheAccess } from '../riscv/cache.js';
+import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
@@ -35,7 +35,7 @@ export function simulatePipeline(program, userConfig = {}) {
         halted: false,
         regs: { x: arch.x, f: arch.f },
         mem: arch.mem,
-        cache: cfg.cache.enabled ? createCache(cfg.cache) : null,
+        cache: createHierarchy(cfg.memory),
         bht: new Array(cfg.bhtEntries).fill(cfg.predictor === '2bit' ? 1 : 0),
         stages: { IF: null, ID: null, EX: null, MEM: null, WB: null },
         forwards: [],
@@ -60,10 +60,17 @@ export function simulatePipeline(program, userConfig = {}) {
     const R = (r) => `**${r}**`;
     const taken = (b) => t(b ? 'common.taken' : 'common.notTaken');
 
+    function describeAccess(r) {
+        const parts = r.path.map((p) => t(p.hit ? 'mem.hitAt' : 'mem.missAt', { level: p.level }));
+        if (r.hitLevel === 'MEM') parts.push(t('mem.main'));
+        return t('mem.path', { path: parts.join(', '), n: r.latency });
+    }
+
     function publicSlot(s) {
         return {
             dyn: s.dyn, index: s.index, a: s.a, b: s.b, c: s.c, result: s.result, addr: s.addr,
             remaining: s.remaining, total: s.total, done: s.done, stalled: s.stalled, taken: s.taken, next: s.next,
+            ifRemaining: s.ifRemaining, ifTotal: s.ifTotal,
             predicted: s.predicted, predictedNext: s.predictedNext,
         };
     }
@@ -182,9 +189,9 @@ export function simulatePipeline(program, userConfig = {}) {
             s.done = false;
             let info = '';
             if ((cls === 'load' || cls === 'store') && S.cache) {
-                const r = cacheAccess(S.cache, cfg.cache, s.addr);
+                const r = hierAccess(S.cache, cfg.memory, 'data', s.addr);
                 s.total = r.latency;
-                info = ' ' + t(r.hit ? 'common.cacheHit' : 'common.cacheMiss', { set: r.set });
+                info = ' ' + describeAccess(r);
             } else {
                 s.total = 1;
             }
@@ -336,9 +343,14 @@ export function simulatePipeline(program, userConfig = {}) {
 
     function doIF() {
         const s = S.stages.IF;
-        if (s) {
-            mark(s, s.ifCycles > 0 ? 'Stall' : 'IF');
-            s.ifCycles++;
+        if (!s) return;
+        if (s.ifRemaining > 0) {
+            s.ifRemaining--;
+            mark(s, 'IF');
+            if (s.ifTotal > 1)
+                step(t(s.ifRemaining > 0 ? 'pipe.ifBusy' : 'pipe.ifDone', { inst: code(s), done: s.ifTotal - s.ifRemaining, total: s.ifTotal }), ['stage:IF', 'cache']);
+        } else {
+            mark(s, 'Stall');
         }
     }
 
@@ -401,7 +413,7 @@ export function simulatePipeline(program, userConfig = {}) {
         // IF -> ID
         let ifFree = true;
         if (st.IF) {
-            if (idFree) {
+            if (idFree && st.IF.ifRemaining === 0) {
                 st.ID = st.IF;
                 st.IF = null;
             } else {
@@ -430,7 +442,16 @@ export function simulatePipeline(program, userConfig = {}) {
                     predictedNext, predicted, idCycles: 0, ifCycles: 0, branchWait: null, stalled: false,
                 };
                 S.pc = predictedNext;
-                step(t(predicted ? 'pipe.fetchPredicted' : 'pipe.fetch', { inst: code(st.IF), addr: A(inst.pc), next: A(predictedNext) }), ['stage:IF', 'pc']);
+                let info = '';
+                st.IF.ifTotal = 1;
+                if (S.cache && cfg.memory.levels.L1I.enabled) {
+                    const r = hierAccess(S.cache, cfg.memory, 'inst', inst.pc);
+                    st.IF.ifTotal = r.latency;
+                    info = ' ' + describeAccess(r);
+                }
+                st.IF.ifRemaining = st.IF.ifTotal;
+                step(t(predicted ? 'pipe.fetchPredicted' : 'pipe.fetch', { inst: code(st.IF), addr: A(inst.pc), next: A(predictedNext) }) + info,
+                    ['stage:IF', 'pc', ...(info ? ['cache'] : [])]);
             }
         }
     }
@@ -471,7 +492,7 @@ export function simulatePipeline(program, userConfig = {}) {
         stats: {
             ...stats, cycles: S.cycle, ipc: S.cycle > 0 ? stats.instructions / S.cycle : 0,
             cpi: stats.instructions > 0 ? S.cycle / stats.instructions : 0,
-            ...(S.cache ? { cacheHits: S.cache.hits, cacheMisses: S.cache.misses } : {}),
+            ...(S.cache ? { memory: hierarchyStats(S.cache) } : {}),
         },
         final: { x: S.regs.x, f: S.regs.f, mem: S.mem },
     };

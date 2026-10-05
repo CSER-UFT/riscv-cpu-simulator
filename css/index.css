@@ -1480,3 +1480,59 @@ td.on {
         transition: none !important;
     }
 }
+
+/* Hierarquia de memória ----------------------------------------------------------------------------------- */
+
+.panel.hierarchy {
+    min-width: 280px;
+}
+
+.panel.hierarchy .level {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-top: 8px;
+}
+
+.panel.hierarchy .level.hit {
+    border-color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 7%, var(--panel));
+}
+
+.panel.hierarchy .level.miss {
+    border-color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 6%, var(--panel));
+}
+
+.level-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.level-head .sub {
+    color: var(--muted);
+    font-size: 0.85em;
+    flex: 1;
+}
+
+.badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0 7px;
+    border-radius: 8px;
+}
+
+.badge.hit {
+    background: var(--ok-soft);
+    color: var(--ok);
+}
+
+.badge.miss {
+    background: var(--bad-soft);
+    color: var(--warn);
+}
+
+table.levels input[type='number'] {
+    width: 70px;
+}
