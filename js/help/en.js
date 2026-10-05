@@ -422,7 +422,7 @@ loop:
             title: 'About',
             html: `
 <p>Developed in the Computer Science program of the Federal University of Tocantins (UFT), Palmas campus, by the CSER group. Free software under the GNU GPL version 3.</p>
-<p>Source code, developer documentation and tests: <a href="https://github.com/CSER-UFT/riscv-processor-simulator">github.com/CSER-UFT/riscv-processor-simulator</a>.</p>
+<p>Source code, developer documentation and tests: <a href="https://github.com/CSER-UFT/riscv-simulator">github.com/CSER-UFT/riscv-simulator</a>.</p>
 <p>References: D. A. Patterson and J. L. Hennessy, <em>Computer Organization and Design: The Hardware/Software Interface, RISC-V Edition</em>; J. L. Hennessy and D. A. Patterson, <em>Computer Architecture: A Quantitative Approach</em>; R. M. Tomasulo, <em>An Efficient Algorithm for Exploiting Multiple Arithmetic Units</em>, IBM Journal, 1967; <em>The RISC-V Instruction Set Manual</em>.</p>`,
         },
     ],

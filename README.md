@@ -1,6 +1,6 @@
 # Simulador de Processadores RISC-V
 
-**Acesse:** [cser-uft.github.io/riscv-processor-simulator](https://cser-uft.github.io/riscv-processor-simulator/)
+**Acesse:** [cser-uft.github.io/riscv-simulator](https://cser-uft.github.io/riscv-simulator/)
 
 Simulador didático de processadores RISC-V, do monociclo ao escalonamento dinâmico pelo [algoritmo de Tomasulo](https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo), desenvolvido para o curso de **Ciência da Computação** da **Universidade Federal do Tocantins**.
 

@@ -422,7 +422,7 @@ laco:
             title: 'Sobre',
             html: `
 <p>Desenvolvido no curso de Ciência da Computação da Universidade Federal do Tocantins (UFT), Câmpus de Palmas, no grupo CSER. Software livre sob a licença GNU GPL versão 3.</p>
-<p>Código fonte, documentação para desenvolvedores e testes: <a href="https://github.com/CSER-UFT/riscv-processor-simulator">github.com/CSER-UFT/riscv-processor-simulator</a>.</p>
+<p>Código fonte, documentação para desenvolvedores e testes: <a href="https://github.com/CSER-UFT/riscv-simulator">github.com/CSER-UFT/riscv-simulator</a>.</p>
 <p>Referências: D. A. Patterson e J. L. Hennessy, <em>Organização e Projeto de Computadores: a interface hardware/software, edição RISC-V</em>; J. L. Hennessy e D. A. Patterson, <em>Arquitetura de Computadores: uma abordagem quantitativa</em>; R. M. Tomasulo, <em>An Efficient Algorithm for Exploiting Multiple Arithmetic Units</em>, IBM Journal, 1967; <em>The RISC-V Instruction Set Manual</em>.</p>`,
         },
     ],
