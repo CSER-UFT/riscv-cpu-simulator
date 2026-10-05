@@ -134,3 +134,13 @@ test('instruções RV64 com XLEN = 64', () => {
 test('programa vazio é erro', () => {
     assert.equal(assemble('# só comentário').errors.length, 1);
 });
+
+test('comentários de código não são confundidos com valores iniciais', () => {
+    const p = asm('# a0 = 5\nlw a1, 0(sp)    # a1 = n\n# t0 = F(i)\n# t1 = 0x10\nadd t2, t0, t1 # t2 = 3');
+    assert.equal(p.init.x.get('x10'), 5n);
+    assert.equal(p.init.x.get('x6'), 16n);
+    assert.equal(p.init.x.has('x11'), false);
+    assert.equal(p.init.x.has('x5'), false);
+    assert.equal(p.init.x.has('x7'), false);
+    assert.equal(assemble('# a0 = 1x2\nnop').errors.length, 1, 'número malformado em linha só de comentário ainda é erro');
+});

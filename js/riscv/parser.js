@@ -265,9 +265,10 @@ export function assemble(source, { xlen = 32 } = {}) {
         let code = cpos >= 0 ? raw.slice(0, cpos) : raw;
         const comment = cpos >= 0 ? raw.slice(cpos + 1) : '';
 
-        // Valores iniciais: "# reg = valor"
-        const im = /^\s*([A-Za-z][\w]*)\s*=\s*(\S+)\s*$/.exec(comment);
-        if (im && canonical(im[1]) !== null) {
+        // Valores iniciais: "# reg = valor", sozinho na linha e com um valor numérico. Comentários depois de
+        // uma instrução, ou com texto depois do "=", são apenas comentários (por exemplo "# a1 = n").
+        const im = code.trim() === '' ? /^\s*([A-Za-z][\w]*)\s*=\s*(\S+)\s*$/.exec(comment) : null;
+        if (im && canonical(im[1]) !== null && /^[+-]?(\d|\.\d|inf|nan)/i.test(im[2])) {
             const reg = canonical(im[1]);
             if (reg === 'x0') {
                 report(lineNo, t('asm.initX0'));

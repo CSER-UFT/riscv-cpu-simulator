@@ -333,7 +333,7 @@ export default {
 <h3>Rótulos, seções e diretivas</h3>
 <p>Rótulos terminam em dois pontos. A seção <code>.text</code> (padrão) contém o código, que começa em <code>0x0</code>; a seção <code>.data</code> contém os dados, que começam em <code>0x10000</code>. Diretivas aceitas: <code>.byte</code>, <code>.half</code>, <code>.word</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code> (ou <code>.zero</code>), <code>.align</code>, <code>.balign</code>, <code>.string</code> (ou <code>.asciz</code>), <code>.ascii</code>, <code>.equ</code> e <code>.set</code>. Imediatos podem ser decimais, hexadecimais (<code>0x</code>), binários (<code>0b</code>), caracteres (<code>'a'</code>), rótulos, <code>rótulo+4</code>, <code>%hi(rótulo)</code> e <code>%lo(rótulo)</code>.</p>
 <h3>Valores iniciais</h3>
-<p>Um comentário no formato <code># registrador = valor</code> define o valor inicial de um registrador: <code># a0 = 10</code>, <code># t1 = 0x20</code>, <code># f1 = 2.5</code>. <code>x0</code> não aceita valor inicial.</p>
+<p>Um comentário no formato <code># registrador = valor</code> define o valor inicial de um registrador: <code># a0 = 10</code>, <code># t1 = 0x20</code>, <code># f1 = 2.5</code>. <code>x0</code> não aceita valor inicial. O comentário precisa estar sozinho na linha e ter um número depois do <code>=</code>; comentários depois de uma instrução, como <code>lw a1, n  # a1 = n</code>, são só comentários.</p>
 <h3>Exemplo</h3>
 <pre><code>.data
 vetor: .word 3, 1, 4, 1, 5

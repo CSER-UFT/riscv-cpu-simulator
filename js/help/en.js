@@ -333,7 +333,7 @@ export default {
 <h3>Labels, sections and directives</h3>
 <p>Labels end with a colon. The <code>.text</code> section (default) holds the code, which starts at <code>0x0</code>; the <code>.data</code> section holds the data, which starts at <code>0x10000</code>. Accepted directives: <code>.byte</code>, <code>.half</code>, <code>.word</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code> (or <code>.zero</code>), <code>.align</code>, <code>.balign</code>, <code>.string</code> (or <code>.asciz</code>), <code>.ascii</code>, <code>.equ</code> and <code>.set</code>. Immediates may be decimal, hexadecimal (<code>0x</code>), binary (<code>0b</code>), characters (<code>'a'</code>), labels, <code>label+4</code>, <code>%hi(label)</code> and <code>%lo(label)</code>.</p>
 <h3>Initial values</h3>
-<p>A comment like <code># register = value</code> sets the initial value of a register: <code># a0 = 10</code>, <code># t1 = 0x20</code>, <code># f1 = 2.5</code>. <code>x0</code> takes no initial value.</p>
+<p>A comment like <code># register = value</code> sets the initial value of a register: <code># a0 = 10</code>, <code># t1 = 0x20</code>, <code># f1 = 2.5</code>. <code>x0</code> takes no initial value. The comment must be alone on its line and have a number after the <code>=</code>; comments after an instruction, such as <code>lw a1, n  # a1 = n</code>, are just comments.</p>
 <h3>Example</h3>
 <pre><code>.data
 array: .word 3, 1, 4, 1, 5

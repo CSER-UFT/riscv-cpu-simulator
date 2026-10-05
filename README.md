@@ -41,7 +41,7 @@ Como o ciclo do monociclo executa uma instrução inteira e o do pipeline e do T
 * **Imediatos**: decimais, hexadecimais (`0x`), binários (`0b`), caracteres (`'a'`), símbolos, `símbolo+N`, `%hi(símbolo)` e `%lo(símbolo)`.
 * **Seções e diretivas**: `.text`, `.data`, `.byte`, `.half`, `.word`, `.dword`, `.float`, `.double`, `.space`, `.zero`, `.align`, `.balign`, `.string`, `.asciz`, `.ascii`, `.equ` e `.set`.
 * **Mapa de memória**: código a partir de `0x0`, dados a partir de `0x10000`, `sp` inicial em `0x7fff0`.
-* **Valores iniciais** de registradores em comentários: `# a0 = 10`, `# f1 = 2.5`.
+* **Valores iniciais** de registradores em comentários sozinhos na linha: `# a0 = 10`, `# f1 = 2.5`.
 
 O editor destaca a sintaxe e marca as linhas com erro; cada erro é listado com o número da linha. Registradores lidos pelo programa, nunca escritos por ele, não usados como endereço base e sem valor inicial recebem valores de exemplo determinísticos (opção que pode ser desligada).
 
