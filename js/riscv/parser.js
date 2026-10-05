@@ -470,7 +470,7 @@ export function assemble(source, { xlen = 32 } = {}) {
         if (!d) fail(`instrução desconhecida: "${name}"`);
         if (d.rv64 && xlen !== 64) fail(`"${name}" pertence ao RV64; altere XLEN para 64 na configuração`);
 
-        const inst = { name, def: d, pc: ipc, rd: null, rs1: null, rs2: null, imm: 0, target: null, rm: null };
+        const inst = { name, def: d, pc: ipc, rd: null, rs1: null, rs2: null, rs3: null, imm: 0, target: null, rm: null };
         const opsText = [];
         let rest = ops;
 
@@ -492,6 +492,13 @@ export function assemble(source, { xlen = 32 } = {}) {
                 setReg('rd', rest[0], 'destino');
                 setReg('rs1', rest[1], 'primeiro operando');
                 setReg('rs2', rest[2], 'segundo operando');
+                break;
+            case 'R4':
+                need(4);
+                setReg('rd', rest[0], 'destino');
+                setReg('rs1', rest[1], 'primeiro operando');
+                setReg('rs2', rest[2], 'segundo operando');
+                setReg('rs3', rest[3], 'terceiro operando');
                 break;
             case 'R2':
                 need(2);

@@ -274,3 +274,63 @@ test('configuração inválida é reportada', () => {
     assert.equal(sim.errors.length, 1);
     assert.match(sim.errors[0], /Multiplicação/);
 });
+
+// Novas opções de hardware ---------------------------------------------------------------------------------
+
+test('unidades funcionais compartilhadas, com e sem pipeline', () => {
+    const src = '# a1 = 3\n# a2 = 4\nmul a0, a1, a2\nmul a3, a1, a2';
+    const group = (pipelined) => ({
+        issueWidth: 2,
+        groups: [
+            { name: 'Int', count: 2, classes: ['alu', 'branch', 'jump'] },
+            { name: 'Mul', count: 2, classes: ['mul', 'div'], units: 1, pipelined },
+        ],
+    });
+    const free = simulate(asm(src), { issueWidth: 2 });
+    const piped = simulate(asm(src), group(true));
+    const blocked = simulate(asm(src), group(false));
+    const start = (sim, i) => sim.dyn[i].marks.find((m) => m[1] === 'Exec')[0];
+    assert.equal(start(free, 1), start(free, 0), 'uma unidade por estação: começam juntas');
+    assert.equal(start(piped, 1), start(piped, 0) + 1, 'unidade com pipeline: uma nova operação por ciclo');
+    assert.equal(start(blocked, 1), start(blocked, 0) + 4, 'unidade sem pipeline: espera a anterior terminar');
+    assert.ok(blocked.stats.unitConflicts > 0);
+});
+
+test('encaminhamento de store para load', () => {
+    const src = '# a0 = 42\n# f1 = 2.0\nfdiv.s f2, f1, f1\nsw a0, -4(sp)\nlw a1, -4(sp)';
+    for (const mode of ['classic', 'rob']) {
+        const without = simulate(asm(src), { mode });
+        const withFwd = simulate(asm(src), { mode, storeForwarding: true });
+        assert.equal(withFwd.final.x[11], 42n);
+        assert.equal(without.final.x[11], 42n);
+        if (mode === 'rob') {
+            assert.equal(withFwd.stats.forwarded, 1);
+            assert.ok(withFwd.dyn[2].write < without.dyn[2].write, 'o load não espera o commit do store');
+        }
+    }
+});
+
+test('recuperação de previsão errada na execução é mais rápida que no commit', () => {
+    const src = '# f1 = 2.0\nli a0, 0\nfdiv.s f2, f1, f1\nbeqz a0, l\naddi a1, a1, 1\naddi a2, a2, 1\nl: addi a3, a3, 1';
+    const atCommit = assertMatchesReference(asm(src), { mode: 'rob', predictor: 'not-taken' }, 'commit');
+    const atWrite = assertMatchesReference(asm(src), { mode: 'rob', predictor: 'not-taken', recovery: 'write' }, 'write');
+    assert.equal(atCommit.stats.mispredicts, 1);
+    assert.equal(atWrite.stats.mispredicts, 1);
+    assert.ok(atWrite.stats.cycles < atCommit.stats.cycles);
+});
+
+test('cache: falha no primeiro acesso ao bloco, acerto nos seguintes', () => {
+    const src = '.data\nv: .word 1, 2, 3, 4\n.text\nla a0, v\nlw a1, 0(a0)\nlw a2, 4(a0)\nlw a3, 64(a0)';
+    const sim = simulate(asm(src), { cache: { enabled: true, size: 64, blockSize: 16, assoc: 1, hitLatency: 1, missLatency: 8 } });
+    assert.equal(sim.stats.cacheMisses, 2);
+    assert.equal(sim.stats.cacheHits, 1);
+    const memCycles = (i) => sim.dyn[i].marks.filter((m) => m[1] === 'Mem').length;
+    assert.equal(memCycles(2), 8);
+    assert.equal(memCycles(3), 1);
+});
+
+test('fmadd no Tomasulo usa três operandos', () => {
+    const src = '# f1 = 2.0\n# f2 = 3.0\nfadd.s f3, f1, f1\nfmadd.s f4, f1, f2, f3';
+    const sim = assertMatchesReference(asm(src), {}, 'fmadd');
+    assert.equal(sim.final.f[4], 10);
+});

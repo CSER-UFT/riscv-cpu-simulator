@@ -34,7 +34,7 @@ export function exampleValue(reg) {
 export function exampleRegisters(program) {
     const read = new Set(), written = new Set(), bases = new Set();
     for (const inst of program.instructions) {
-        for (const r of [inst.rs1, inst.rs2])
+        for (const r of [inst.rs1, inst.rs2, inst.rs3])
             if (r) read.add(r);
         if (inst.rd) written.add(inst.rd);
         if (inst.rs1 && (inst.def.mem || inst.name === 'jalr'))
@@ -122,6 +122,7 @@ export function runReference(program, { exampleValues = true, maxInstructions = 
         const d = inst.def;
         const a = readReg(st, inst.rs1);
         const b = readReg(st, inst.rs2);
+        const c = readReg(st, inst.rs3);
         executed++;
         let next = pc + 4;
         switch (d.cls) {
@@ -141,7 +142,7 @@ export function runReference(program, { exampleValues = true, maxInstructions = 
                 break;
             }
             default:
-                writeReg(st, inst.rd, d.exec(a, b, inst, xlen));
+                writeReg(st, inst.rd, d.exec(a, b, inst, xlen, c));
         }
         pc = next;
     }

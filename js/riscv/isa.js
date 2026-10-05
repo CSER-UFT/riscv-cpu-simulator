@@ -4,8 +4,8 @@
  * Cada instrução é descrita por uma entrada com:
  *   fmt   formato da sintaxe de operandos (ver OPERAND_FORMATS em parser.js)
  *   cls   classe de operação, usada para escolher estação de reserva e latência
- *   rd, rs1, rs2   banco de cada operando ('x', 'f' ou null)
- *   exec  semântica: (a, b, inst, xlen) => resultado
+ *   rd, rs1, rs2, rs3   banco de cada operando ('x', 'f' ou null)
+ *   exec  semântica: (a, b, inst, xlen, c) => resultado (c é o terceiro operando, usado só no formato R4)
  *   cond  (desvios) semântica: (a, b, xlen) => booleano
  *   mem   (loads/stores) { size, signed, fp }
  *   rv64  instrução disponível apenas com XLEN = 64
@@ -13,7 +13,7 @@
  * Para acrescentar uma instrução basta acrescentar uma entrada aqui; parser, simulador de referência e
  * motor de Tomasulo são genéricos e usam apenas esta tabela.
  */
-import { signed, unsigned, f32ToBits, bitsToF32, f64ToBits, bitsToF64, floatToInt } from './bits.js';
+import { signed, unsigned, f32ToBits, bitsToF32, f64ToBits, bitsToF64, floatToInt, fusedMulAdd } from './bits.js';
 
 /** Classes de operação. A ordem define a ordem de exibição na configuração. */
 export const CLASSES = {
@@ -33,7 +33,7 @@ export const CLASSES = {
 const ISA = new Map();
 
 function def(name, props) {
-    ISA.set(name, { name, rd: null, rs1: null, rs2: null, ...props });
+    ISA.set(name, { name, rd: null, rs1: null, rs2: null, rs3: null, ...props });
 }
 
 const fr = Math.fround;
@@ -202,6 +202,14 @@ function floatOps(p) {
     def(`feq.${p}`, { fmt: 'R', cls: 'fadd', rd: 'x', rs1: 'f', rs2: 'f', exec: (a, b) => bool(a === b) });
     def(`flt.${p}`, { fmt: 'R', cls: 'fadd', rd: 'x', rs1: 'f', rs2: 'f', exec: (a, b) => bool(a < b) });
     def(`fle.${p}`, { fmt: 'R', cls: 'fadd', rd: 'x', rs1: 'f', rs2: 'f', exec: (a, b) => bool(a <= b) });
+
+    // Multiplicação e soma fundidas (formato R4: três operandos fonte), executadas no multiplicador
+    const prec = single ? 24 : 53;
+    const R4 = (name, fn) => def(`${name}.${p}`, { fmt: 'R4', cls: 'fmul', rd: 'f', rs1: 'f', rs2: 'f', rs3: 'f', rm: true, exec: fn });
+    R4('fmadd', (a, b, i, x, c) => round(fusedMulAdd(a, b, c, prec)));
+    R4('fmsub', (a, b, i, x, c) => round(fusedMulAdd(a, b, -c, prec)));
+    R4('fnmsub', (a, b, i, x, c) => round(fusedMulAdd(-a, b, c, prec)));
+    R4('fnmadd', (a, b, i, x, c) => round(fusedMulAdd(-a, b, -c, prec)));
 
     def(`fsqrt.${p}`, { fmt: 'R2', cls: 'fdiv', rd: 'f', rs1: 'f', rm: true, exec: (a) => round(Math.sqrt(a)) });
 

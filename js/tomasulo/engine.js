@@ -2,8 +2,9 @@
  * Motor genérico do algoritmo de Tomasulo, nos modos clássico e especulativo (com buffer de reordenação).
  *
  * O motor não conhece instruções específicas: usa apenas a classe (cls), os registradores e a semântica
- * descritos em riscv/isa.js. Estações de reserva, latências, largura de emissão, de CDB e de commit,
- * tamanho do ROB e preditor de desvios vêm da configuração.
+ * descritos em riscv/isa.js. Estações de reserva, unidades funcionais, latências, larguras de emissão,
+ * de CDB e de commit, tamanho do ROB, preditor de desvios, cache e políticas de recuperação vêm da
+ * configuração.
  *
  * Ordem das fases dentro de um ciclo:
  *   1. Commit (modo ROB): retira, em ordem, entradas prontas desde um ciclo anterior.
@@ -12,23 +13,25 @@
  *   3. Execute: estações cujos operandos estavam disponíveis no início do ciclo iniciam ou continuam.
  *      As decisões desta fase usam o estado do início da fase, para não depender da ordem das estações.
  *   4. Issue: até issueWidth instruções, em ordem, desde que haja estação (e entrada no ROB) livre.
- *      Um valor difundido neste ciclo já é visto pela emissão, mas só pode ser usado na execução no
- *      ciclo seguinte.
  *
  * Desambiguação de memória: endereços efetivos são calculados em ordem de programa; um load só acessa a
- * memória se nenhum store anterior pendente escreve em bytes que se sobrepõem; no modo clássico, um store
- * só escreve se nenhum load ou store anterior pendente acessa os mesmos bytes. No modo ROB os stores
- * escrevem na memória apenas no commit.
+ * memória se nenhum store anterior pendente escreve em bytes que se sobrepõem (ou, com encaminhamento
+ * habilitado, recebe o valor do store anterior mais recente que escreve exatamente os mesmos bytes); no
+ * modo clássico, um store só escreve se nenhum load ou store anterior pendente acessa os mesmos bytes.
+ * No modo ROB os stores escrevem na memória apenas no commit.
  */
-import { CLASSES } from '../riscv/isa.js';
 import * as memory from '../riscv/memory.js';
+import { createCache, access as cacheAccess } from '../riscv/cache.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
-import { normalizeConfig, checkProgram } from './config.js';
+import { t } from '../i18n/index.js';
+import { normalizeConfig, checkProgram, className } from './config.js';
+import { Recorder } from './recorder.js';
 
 const MEM_CLASSES = new Set(['load', 'store']);
 const ADDRESS_KNOWN = new Set(['addrDone', 'mem', 'memw', 'done']);
+const FU_STAGES = new Set(['exec', 'mem', 'memw']);
 
 /**
  * Simula o programa.
@@ -42,9 +45,9 @@ export function simulate(program, userConfig = {}) {
         return { errors };
 
     const xlen = program.xlen;
-    const trace = userConfig.trace !== false;
     const speculative = cfg.mode === 'rob';
     const arch = initialState(program, { exampleValues: cfg.exampleValues });
+    const groupByName = new Map(cfg.groups.map((g) => [g.name, g]));
 
     const stations = [];
     for (const g of cfg.groups)
@@ -62,49 +65,23 @@ export function simulate(program, userConfig = {}) {
         mem: arch.mem,
         cdb: [],
         bht: new Array(cfg.bhtEntries).fill(cfg.predictor === '2bit' ? 1 : 0),
-        focus: [],
-        seq: 0,
-        finished: false,
+        cache: cfg.cache.enabled ? createCache(cfg.cache) : null,
+        units: {},
     };
 
     const dyn = [];
-    const stats = { issued: 0, committed: 0, squashed: 0, branches: 0, mispredicts: 0, stallStructural: 0, stallRob: 0, cdbConflicts: 0 };
+    const stats = {
+        issued: 0, committed: 0, squashed: 0, branches: 0, mispredicts: 0, stallStructural: 0, stallRob: 0,
+        cdbConflicts: 0, unitConflicts: 0, forwarded: 0,
+    };
     const warnings = [];
-    let steps = [];
 
-    // Registro de passos e linha do tempo -----------------------------------------------------------------
-
-    // A memória é tratada como imutável (cópia a cada escrita), para que os instantâneos possam compartilhá-la
-    // em vez de copiá-la a cada passo.
-    const snapshot = () => {
-        const snap = structuredClone({
-            cycle: S.cycle, pc: S.pc, fetch: S.fetch, regs: S.regs, status: S.status, stations: S.stations,
-            rob: S.rob, cdb: S.cdb, bht: S.bht, focus: S.focus, seq: S.seq, queue: queueView(),
-        });
-        snap.mem = S.mem;
-        return snap;
-    };
-
-    const writeMemory = (addr, spec, value) => {
-        S.mem = new Map(S.mem);
-        memory.store(S.mem, addr, spec, value);
-    };
-
-    let pendingMarks = [];
-    const step = (msg, focus = []) => {
-        S.seq++;
-        S.focus = focus;
-        for (const m of pendingMarks) m[2] = S.seq;
-        pendingMarks = [];
-        if (trace) steps.push([msg, snapshot()]);
-    };
-
-    /** Registra um rótulo na linha do tempo; ele passa a valer no próximo passo registrado. */
-    const mark = (d, label) => {
-        const m = [S.cycle, label, null];
-        d.marks.push(m);
-        pendingMarks.push(m);
-    };
+    const rec = new Recorder(userConfig.trace !== false, () => ({
+        cycle: S.cycle, pc: S.pc, fetch: S.fetch, regs: S.regs, status: S.status, stations: S.stations,
+        rob: S.rob, cdb: S.cdb, bht: S.bht, cache: S.cache, units: S.units, queue: queueView(),
+    }), () => S.mem);
+    const step = (msg, focus = []) => rec.step(msg, focus);
+    const mark = (d, label) => rec.mark(d, S.cycle, label);
 
     function queueView() {
         const out = [];
@@ -132,10 +109,16 @@ export function simulate(program, userConfig = {}) {
     const dynOf = (id) => dyn[id];
     const instOf = (st) => program.instructions[dyn[st.dyn].index];
     const code = (inst) => `\`${inst.text}\``;
-    const regName = (r) => `**${r}**`;
-    const v = (x) => `//${fmt.value(x)}//`;
+    const R = (r) => `**${r}**`;
+    const V = (x) => `//${fmt.value(x)}//`;
+    const A = (x) => `//${fmt.address(x)}//`;
     const busyStations = () => S.stations.filter((s) => s.busy).sort((a, b) => a.dyn - b.dyn);
-    const latencyOf = (cls) => cfg.latency[cls];
+    const taken = (b) => t(b ? 'common.taken' : 'common.notTaken');
+
+    const writeMemory = (addr, spec, value) => {
+        S.mem = new Map(S.mem);
+        memory.store(S.mem, addr, spec, value);
+    };
 
     function readOperand(reg) {
         if (reg === null) return null;
@@ -160,10 +143,16 @@ export function simulate(program, userConfig = {}) {
         }
     }
 
-    function trainPredictor(inst, taken) {
+    function trainPredictor(inst, wasTaken) {
         const idx = (inst.pc >> 2) % cfg.bhtEntries;
-        if (cfg.predictor === '1bit') S.bht[idx] = taken ? 1 : 0;
-        if (cfg.predictor === '2bit') S.bht[idx] = Math.max(0, Math.min(3, S.bht[idx] + (taken ? 1 : -1)));
+        if (cfg.predictor === '1bit') S.bht[idx] = wasTaken ? 1 : 0;
+        if (cfg.predictor === '2bit') S.bht[idx] = Math.max(0, Math.min(3, S.bht[idx] + (wasTaken ? 1 : -1)));
+    }
+
+    function cacheLatency(addr, fallback) {
+        if (!S.cache) return { latency: fallback, info: '' };
+        const r = cacheAccess(S.cache, cfg.cache, addr);
+        return { latency: r.latency, info: t(r.hit ? 'common.cacheHit' : 'common.cacheMiss', { set: r.set }) };
     }
 
     // 1. Commit ---------------------------------------------------------------------------------------------
@@ -176,46 +165,40 @@ export function simulate(program, userConfig = {}) {
             const d = dynOf(e.dyn);
             const inst = program.instructions[d.index];
             const tag = robTag(S.rob.head);
-            let mispredicted = false;
+            const focus = [`rob:${S.rob.head}`];
+            let flushNow = false;
 
+            mark(d, 'Commit');
             if (e.kind === 'store') {
                 writeMemory(e.addr, inst.def.mem, e.data);
-                mark(d, 'Commit');
-                step(`Commit de ${code(inst)} (ROB **${tag}**): o valor ${v(e.data)} é escrito na memória no endereço ${v(fmt.address(e.addr))}.`,
-                    [`rob:${S.rob.head}`, `mem:${e.addr}`]);
+                const info = S.cache ? ' ' + cacheLatency(e.addr, 1).info : '';
+                step(t('tom.commitStore', { inst: code(inst), tag, value: V(e.data), addr: A(e.addr) }) + info, [...focus, `mem:${e.addr}`]);
             } else if (e.kind === 'branch') {
                 stats.branches++;
                 trainPredictor(inst, e.taken);
-                mispredicted = e.mispredict;
-                mark(d, 'Commit');
-                if (mispredicted) {
+                if (e.mispredict) {
                     stats.mispredicts++;
                     d.mispredicted = true;
-                    step(`Commit de ${code(inst)} (ROB **${tag}**): o desvio foi ${e.taken ? 'tomado' : 'não tomado'}, mas a previsão foi ${e.predicted ? 'tomado' : 'não tomado'}. **Previsão errada**: todas as instruções posteriores são descartadas e a busca recomeça em ${v(fmt.address(e.next))}.`,
-                        [`rob:${S.rob.head}`, 'pc']);
+                    if (e.recovered) {
+                        step(t('tom.commitBranchRecovered', { inst: code(inst), tag }), focus);
+                    } else {
+                        flushNow = true;
+                        step(t('tom.commitBranchWrong', { inst: code(inst), tag, actual: taken(e.taken), predicted: taken(e.predicted), addr: A(e.next) }), [...focus, 'pc']);
+                    }
                 } else {
-                    step(`Commit de ${code(inst)} (ROB **${tag}**): previsão correta (${e.taken ? 'tomado' : 'não tomado'}).`, [`rob:${S.rob.head}`]);
+                    step(t('tom.commitBranchOk', { inst: code(inst), tag, actual: taken(e.taken) }), focus);
                 }
             } else if (e.kind === 'system') {
-                mark(d, 'Commit');
                 S.fetch.halted = true;
-                step(`Commit de ${code(inst)}: fim do programa.`, [`rob:${S.rob.head}`]);
+                step(t('tom.commitSystem', { inst: code(inst) }), focus);
+            } else if (e.dest) {
+                writeReg(S.regs, e.dest, e.value);
+                let extra = '';
+                if (S.status[e.dest] === tag) delete S.status[e.dest];
+                else if (S.status[e.dest] !== undefined) extra = ' ' + t('tom.commitNewer', { tag: S.status[e.dest] });
+                step(t('tom.commitReg', { inst: code(inst), tag, reg: R(e.dest), value: V(e.value) }) + extra, [...focus, `reg:${e.dest}`]);
             } else {
-                if (e.dest) {
-                    writeReg(S.regs, e.dest, e.value);
-                    let extra = '';
-                    if (S.status[e.dest] === tag) {
-                        delete S.status[e.dest];
-                    } else if (S.status[e.dest] !== undefined) {
-                        extra = ` O registrador continua aguardando a entrada **${S.status[e.dest]}**, mais recente.`;
-                    }
-                    mark(d, 'Commit');
-                    step(`Commit de ${code(inst)} (ROB **${tag}**): ${regName(e.dest)} recebe ${v(e.value)} no banco de registradores.${extra}`,
-                        [`rob:${S.rob.head}`, `reg:${e.dest}`]);
-                } else {
-                    mark(d, 'Commit');
-                    step(`Commit de ${code(inst)} (ROB **${tag}**).`, [`rob:${S.rob.head}`]);
-                }
+                step(t('tom.commitPlain', { inst: code(inst), tag }), focus);
             }
 
             d.commit = S.cycle;
@@ -224,40 +207,48 @@ export function simulate(program, userConfig = {}) {
             S.rob.head = (S.rob.head + 1) % cfg.robSize;
             S.rob.count--;
 
-            if (mispredicted) {
-                flush(e.next);
+            if (flushNow) {
+                squashAfter(null, e.next);
                 break;
             }
-            if (e.kind === 'system') {
-                // Nada após o ecall foi buscado; o ROB já está vazio.
+            if (e.kind === 'system')
                 break;
-            }
         }
     }
 
-    function flush(nextPc) {
-        const squashed = robEntries();
+    /**
+     * Descarta todas as instruções do ROB posteriores à entrada `keepUntil` (índice no ROB), ou todas se
+     * for null, e redireciona a busca para `nextPc`.
+     */
+    function squashAfter(keepUntil, nextPc) {
+        const entries = robEntries();
+        const keep = keepUntil === null ? 0 : entries.findIndex((e) => e.index === keepUntil) + 1;
+        const squashed = entries.slice(keep);
+        const ids = new Set();
         for (const e of squashed) {
             const d = dynOf(e.dyn);
             d.squashed = S.cycle;
+            ids.add(d.id);
             mark(d, 'Descartada');
             stats.squashed++;
+            S.rob.entries[e.index] = null;
         }
+        S.rob.count = keep;
         for (const st of S.stations)
-            if (st.busy && dyn[st.dyn].squashed !== null)
+            if (st.busy && ids.has(st.dyn))
                 Object.assign(st, emptyStation(st.name, st.group, st.classes));
-        S.rob.entries.fill(null);
-        S.rob.count = 0;
+        // Reconstrói a tabela de status a partir das entradas que permaneceram (em ordem de programa).
         S.status = {};
+        for (const e of entries.slice(0, keep))
+            if (e.kind === 'reg' && e.dest) S.status[e.dest] = robTag(e.index);
         S.pc = nextPc;
         S.fetch = { halted: false, stall: null, resumeAt: S.cycle + 1 };
-        step(`${squashed.length} instrução(ões) do caminho errado descartada(s); estações e ROB liberados, tabela de status dos registradores limpa.`,
-            ['rob', 'pc']);
+        step(t('tom.squash', { n: squashed.length }), ['rob', 'pc']);
     }
 
     // 2. Write result ---------------------------------------------------------------------------------------
 
-    function usesCdb(st, inst) {
+    function usesCdb(inst) {
         if (inst.def.cls === 'branch' || inst.def.cls === 'store') return false;
         return inst.rd !== null && inst.rd !== 'x0';
     }
@@ -266,30 +257,45 @@ export function simulate(program, userConfig = {}) {
         const receivers = [];
         for (const st of S.stations) {
             if (!st.busy) continue;
-            if (st.Qj === tag) { st.Vj = value; st.Qj = null; st.jReadyAt = S.cycle + 1; receivers.push(`**${st.name}**.Vj`); }
-            if (st.Qk === tag) { st.Vk = value; st.Qk = null; st.kReadyAt = S.cycle + 1; receivers.push(`**${st.name}**.Vk`); }
+            for (const side of ['j', 'k', 'm']) {
+                if (st[`Q${side}`] === tag) {
+                    st[`V${side}`] = value;
+                    st[`Q${side}`] = null;
+                    st[`${side}ReadyAt`] = S.cycle + 1;
+                    receivers.push(`**${st.name}**.V${side}`);
+                }
+            }
         }
+        const regs = [];
         if (!speculative) {
             for (const reg of Object.keys(S.status)) {
                 if (S.status[reg] === tag) {
                     writeReg(S.regs, reg, value);
                     delete S.status[reg];
-                    receivers.push(regName(reg));
+                    receivers.push(R(reg));
+                    regs.push(reg);
                 }
             }
         }
         S.cdb.push({ from: sourceName, tag, value });
-        return receivers;
+        return { receivers, regs };
+    }
+
+    function redirect(nextPc) {
+        S.pc = nextPc;
+        S.fetch.stall = null;
+        S.fetch.resumeAt = S.cycle + 1;
     }
 
     function writePhase() {
-        const ready = busyStations().filter((st) => st.stage === 'done' && st.doneAt < S.cycle);
+        const ready = busyStations().filter((st) => st.stage === 'done' && st.doneAt < S.cycle).map((st) => [st, st.dyn]);
         let used = 0;
         const waiting = [];
-        for (const st of ready) {
+        for (const [st, id] of ready) {
+            if (!st.busy || st.dyn !== id) continue; // descartada por uma recuperação neste ciclo
             const inst = instOf(st);
             const d = dynOf(st.dyn);
-            const needsCdb = usesCdb(st, inst);
+            const needsCdb = usesCdb(inst);
             if (needsCdb && used >= cfg.cdbWidth) {
                 waiting.push(st);
                 continue;
@@ -298,6 +304,7 @@ export function simulate(program, userConfig = {}) {
             const tag = speculative ? robTag(st.rob) : st.name;
             const focus = [`st:${st.name}`];
             let msg;
+            let recover = null;
 
             if (speculative) {
                 const e = S.rob.entries[st.rob];
@@ -307,106 +314,114 @@ export function simulate(program, userConfig = {}) {
                 if (inst.def.cls === 'store') {
                     e.addr = st.addr;
                     e.data = st.Vk;
-                    msg = `${code(inst)} (**${st.name}**) tem endereço e valor prontos: ${v(st.Vk)} para ${v(fmt.address(st.addr))} fica no ROB **${tag}** até o commit.`;
+                    msg = t('tom.writeStoreRob', { inst: code(inst), st: st.name, value: V(st.Vk), addr: A(st.addr), tag });
                 } else if (inst.def.cls === 'branch') {
                     e.taken = st.result.taken;
                     e.next = st.result.next;
                     e.mispredict = e.next !== e.predictedNext;
-                    msg = `${code(inst)} (**${st.name}**) resolvido: ${e.taken ? 'tomado' : 'não tomado'}. Previsto: ${e.predicted ? 'tomado' : 'não tomado'}${e.mispredict ? ' (**previsão errada**, corrigida no commit)' : ' (correto)'}.`;
+                    const p = { inst: code(inst), st: st.name, actual: taken(e.taken), predicted: taken(e.predicted) };
+                    if (e.mispredict && cfg.recovery === 'write') {
+                        e.recovered = true;
+                        recover = e;
+                        msg = t('tom.writeBranchRecoverNow', p);
+                    } else {
+                        msg = t(e.mispredict ? 'tom.writeBranchWrong' : 'tom.writeBranchOk', p);
+                    }
                 } else {
                     e.value = st.result.value;
-                    let receivers = [];
+                    let r = { receivers: [] };
                     if (needsCdb) {
-                        receivers = broadcast(tag, e.value, st.name);
+                        r = broadcast(tag, e.value, st.name);
                         focus.push('cdb');
                     }
-                    msg = `**${st.name}** escreve o resultado ${v(e.value)} de ${code(inst)} no ROB **${tag}**` +
-                        (needsCdb ? ` e o difunde pelo CDB${receivers.length ? ` para ${receivers.join(', ')}` : ''}.` : '.');
+                    msg = needsCdb
+                        ? t('tom.writeRobCdb', { st: st.name, value: V(e.value), inst: code(inst), tag, to: r.receivers.length ? r.receivers.join(', ') : t('tom.nobody') })
+                        : t('tom.writeRob', { st: st.name, value: V(e.value), inst: code(inst), tag });
                     if (inst.name === 'jalr') {
-                        S.pc = st.result.next;
-                        S.fetch.stall = null;
-                        S.fetch.resumeAt = S.cycle + 1;
-                        msg += ` O destino do salto (${v(fmt.address(S.pc))}) é conhecido e a busca de instruções é retomada.`;
+                        redirect(st.result.next);
+                        msg += ' ' + t('tom.jalrResume', { addr: A(S.pc) });
                         focus.push('pc');
                     }
                 }
+            } else if (inst.def.cls === 'branch') {
+                redirect(st.result.next);
+                stats.branches++;
+                msg = t('tom.writeBranchClassic', { inst: code(inst), st: st.name, actual: taken(st.result.taken), addr: A(S.pc) });
+                focus.push('pc');
             } else {
-                if (inst.def.cls === 'branch') {
-                    S.pc = st.result.next;
-                    S.fetch.stall = null;
-                    S.fetch.resumeAt = S.cycle + 1;
-                    stats.branches++;
-                    msg = `${code(inst)} (**${st.name}**) resolvido: ${st.result.taken ? 'tomado' : 'não tomado'}. A emissão é retomada em ${v(fmt.address(S.pc))} no próximo ciclo.`;
-                    focus.push('pc');
+                const value = st.result.value;
+                if (needsCdb) {
+                    const r = broadcast(tag, value, st.name);
+                    focus.push('cdb', ...r.regs.map((x) => `reg:${x}`));
+                    msg = t('tom.writeCdb', { st: st.name, value: V(value), inst: code(inst), to: r.receivers.length ? r.receivers.join(', ') : t('tom.nobody') });
                 } else {
-                    const value = st.result.value;
-                    let receivers = [];
-                    if (needsCdb) {
-                        receivers = broadcast(tag, value, st.name);
-                        focus.push('cdb', ...receivers.filter((r) => r.startsWith('**x') || r.startsWith('**f')).map((r) => `reg:${r.replace(/\*/g, '')}`));
-                    }
-                    msg = needsCdb
-                        ? `**${st.name}** difunde o resultado ${v(value)} de ${code(inst)} pelo CDB${receivers.length ? ` para ${receivers.join(', ')}` : ' (nenhum recipiente aguardava)'}.`
-                        : `**${st.name}** conclui ${code(inst)} (destino x0, nada a escrever).`;
-                    if (inst.name === 'jalr') {
-                        S.pc = st.result.next;
-                        S.fetch.stall = null;
-                        S.fetch.resumeAt = S.cycle + 1;
-                        msg += ` A emissão é retomada no destino do salto, ${v(fmt.address(S.pc))}.`;
-                        focus.push('pc');
-                    }
+                    msg = t('tom.writeNoDest', { st: st.name, inst: code(inst) });
+                }
+                if (inst.name === 'jalr') {
+                    redirect(st.result.next);
+                    msg += ' ' + t('tom.jalrResume', { addr: A(S.pc) });
+                    focus.push('pc');
                 }
             }
             d.write = S.cycle;
             mark(d, 'Write');
             Object.assign(st, emptyStation(st.name, st.group, st.classes));
-            msg += ` A estação **${st.name}** é liberada.`;
+            msg += ' ' + t('tom.stationFreed', { st: st.name });
             step(msg, focus);
+            if (recover)
+                squashAfter(recover.index, recover.next);
         }
         if (waiting.length > 0) {
             stats.cdbConflicts += waiting.length;
-            step(`CDB ocupado neste ciclo: ${waiting.map((s) => `**${s.name}**`).join(', ')} aguarda(m) para difundir o resultado.`,
-                waiting.map((s) => `st:${s.name}`));
+            step(t('tom.cdbBusy', { list: waiting.map((s) => `**${s.name}**`).join(', ') }), waiting.map((s) => `st:${s.name}`));
         }
     }
 
     // 3. Execute --------------------------------------------------------------------------------------------
 
-    const operandsReady = (st) =>
-        (st.Qj === null && st.jReadyAt <= S.cycle) && (st.Qk === null && st.kReadyAt <= S.cycle);
+    const sideReady = (st, side) => st[`Q${side}`] === null && st[`${side}ReadyAt`] <= S.cycle;
+    const operandsReady = (st) => sideReady(st, 'j') && sideReady(st, 'k') && sideReady(st, 'm');
 
     function olderMemAddressesKnown(st) {
         return S.stations.every((o) => !o.busy || o.dyn >= st.dyn || !MEM_CLASSES.has(o.cls) || ADDRESS_KNOWN.has(o.stage));
     }
 
-    function memRange(st) {
-        return [st.addr, instOf(st).def.mem.size];
-    }
+    const memSpec = (dynId) => program.instructions[dyn[dynId].index].def.mem;
 
-    function loadConflict(st) {
-        const [a, sa] = memRange(st);
-        for (const o of S.stations) {
-            if (!o.busy || o.dyn >= st.dyn || o.cls !== 'store') continue;
-            const [b, sb] = memRange(o);
-            if (memory.overlaps(a, sa, b, sb)) return o.name;
+    /**
+     * Decide o acesso de um load: null (memória livre), {wait: nome} ou {forward: valor, from: nome}.
+     */
+    function loadSource(st) {
+        const a = st.addr, sa = memSpec(st.dyn).size;
+        let youngest = null;
+        const consider = (dynId, addr, name, dataReady, data) => {
+            if (dynId >= st.dyn || addr === null) return;
+            if (!memory.overlaps(a, sa, addr, memSpec(dynId).size)) return;
+            if (!youngest || dynId > youngest.dynId)
+                youngest = { dynId, addr, name, dataReady, data };
+        };
+        for (const o of S.stations)
+            if (o.busy && o.cls === 'store')
+                consider(o.dyn, o.addr, o.name, sideReady(o, 'k'), o.Vk);
+        if (speculative)
+            for (const e of robEntries())
+                if (e.kind === 'store' && e.addr !== null)
+                    consider(e.dyn, e.addr, `ROB ${robTag(e.index)}`, true, e.data);
+        if (!youngest) return null;
+        if (cfg.storeForwarding && youngest.addr === a && memSpec(youngest.dynId).size === sa && youngest.dataReady) {
+            const tmp = new Map();
+            memory.store(tmp, a, memSpec(youngest.dynId), youngest.data);
+            return { forward: memory.load(tmp, a, memSpec(st.dyn), xlen), from: youngest.name };
         }
-        if (speculative) {
-            for (const e of robEntries()) {
-                if (e.kind !== 'store' || e.dyn >= st.dyn || e.addr === null) continue;
-                if (memory.overlaps(a, sa, e.addr, program.instructions[dyn[e.dyn].index].def.mem.size))
-                    return `ROB ${robTag(e.index)}`;
-            }
-        }
-        return null;
+        return { wait: youngest.name };
     }
 
     function storeConflict(st) {
-        const [a, sa] = memRange(st);
+        const a = st.addr, sa = memSpec(st.dyn).size;
         for (const o of S.stations) {
             if (!o.busy || o.dyn >= st.dyn || !MEM_CLASSES.has(o.cls)) continue;
             if (o.cls === 'load' && o.stage === 'done') continue;
-            const [b, sb] = memRange(o);
-            if (memory.overlaps(a, sa, b, sb)) return o.name;
+            if (memory.overlaps(a, sa, o.addr, memSpec(o.dyn).size)) return o.name;
         }
         return null;
     }
@@ -417,23 +432,23 @@ export function simulate(program, userConfig = {}) {
             const r = resolveControl(inst, st.Vj, st.Vk, xlen);
             st.result = { taken: r.taken, next: r.next, value: r.value };
             return d.cls === 'branch'
-                ? `${r.taken ? 'tomado' : 'não tomado'}`
-                : `${regName(inst.rd)} = ${fmt.value(r.value)}, destino ${fmt.address(r.next)}`;
+                ? taken(r.taken)
+                : t('tom.jumpResult', { reg: R(inst.rd), value: fmt.value(r.value), addr: fmt.address(r.next) });
         }
-        st.result = { value: d.exec(st.Vj, st.Vk, inst, xlen) };
-        return v(st.result.value);
+        st.result = { value: d.exec(st.Vj, st.Vk, inst, xlen, st.Vm) };
+        return V(st.result.value);
     }
 
     function executePhase() {
         const busy = busyStations();
         const actions = [];
-        const memWaits = [];
+        const waits = [];
         for (const st of busy) {
             switch (st.stage) {
                 case 'issued':
                     if (st.issuedAt >= S.cycle) break;
                     if (MEM_CLASSES.has(st.cls)) {
-                        if (st.Qj === null && st.jReadyAt <= S.cycle && olderMemAddressesKnown(st))
+                        if (sideReady(st, 'j') && olderMemAddressesKnown(st))
                             actions.push(['startAddr', st]);
                     } else if (operandsReady(st)) {
                         actions.push(['startExec', st]);
@@ -442,16 +457,17 @@ export function simulate(program, userConfig = {}) {
                 case 'addrDone':
                     if (st.addrAt >= S.cycle) break;
                     if (st.cls === 'load') {
-                        const c = loadConflict(st);
-                        if (c === null) actions.push(['startMem', st]);
-                        else memWaits.push(`**${st.name}** aguarda **${c}**, que escreve no mesmo endereço (${fmt.address(st.addr)})`);
-                    } else if (st.Qk === null && st.kReadyAt <= S.cycle) {
+                        const src = loadSource(st);
+                        if (src === null) actions.push(['startMem', st]);
+                        else if (src.forward !== undefined) actions.push(['forward', st, src]);
+                        else waits.push(t('tom.waitLoad', { st: st.name, other: src.wait, addr: fmt.address(st.addr) }));
+                    } else if (sideReady(st, 'k')) {
                         if (speculative) {
                             actions.push(['storeReady', st]);
                         } else {
                             const c = storeConflict(st);
                             if (c === null) actions.push(['startMemWrite', st]);
-                            else memWaits.push(`**${st.name}** aguarda **${c}**, que acessa o mesmo endereço (${fmt.address(st.addr)})`);
+                            else waits.push(t('tom.waitStore', { st: st.name, other: c, addr: fmt.address(st.addr) }));
                         }
                     }
                     break;
@@ -461,47 +477,80 @@ export function simulate(program, userConfig = {}) {
             }
         }
 
+        // Unidades funcionais compartilhadas: ocupadas pelas operações em andamento (unidades sem pipeline) e
+        // pelas que iniciam neste ciclo.
+        const unitsUsed = {};
+        for (const g of cfg.groups)
+            unitsUsed[g.name] = g.pipelined ? 0 : busy.filter((s) => s.group === g.name && FU_STAGES.has(s.stage) && !s.forwarding).length;
+        const needsUnit = new Set(['startExec', 'startMem', 'startMemWrite']);
+
         const progress = [];
-        for (const [action, st] of actions) {
+        for (const [action, st, extra] of actions) {
             const inst = instOf(st);
             const d = dynOf(st.dyn);
+            const g = groupByName.get(st.group);
+            if (needsUnit.has(action) && g.units !== null) {
+                if (unitsUsed[g.name] >= g.units) {
+                    stats.unitConflicts++;
+                    st.waitingUnit = true;
+                    waits.push(t('tom.waitUnit', { st: st.name, group: g.name }));
+                    continue;
+                }
+                unitsUsed[g.name]++;
+            }
+            st.waitingUnit = false;
             switch (action) {
                 case 'startExec':
                     st.stage = 'exec';
-                    st.total = latencyOf(st.cls);
+                    st.total = cfg.latency[st.cls];
                     st.remaining = st.total;
                     d.execStart ??= S.cycle;
-                    step(`**${st.name}** inicia a execução de ${code(inst)} (latência de ${st.total} ciclo(s)).`, [`st:${st.name}`]);
+                    step(t('tom.startExec', { st: st.name, inst: code(inst), lat: st.total }), [`st:${st.name}`]);
                     break;
                 case 'startAddr':
                     st.stage = 'addr';
-                    st.total = latencyOf('address');
+                    st.total = cfg.latency.address;
                     st.remaining = st.total;
                     d.execStart ??= S.cycle;
                     break;
-                case 'startMem':
+                case 'startMem': {
+                    const c = cacheLatency(st.addr, cfg.latency.load);
                     st.stage = 'mem';
-                    st.total = latencyOf('load');
+                    st.total = c.latency;
                     st.remaining = st.total;
-                    step(`**${st.name}** inicia a leitura da memória em ${v(fmt.address(st.addr))}.`, [`st:${st.name}`, `mem:${st.addr}`]);
+                    step(t('tom.startMem', { st: st.name, addr: A(st.addr) }) + (c.info ? ' ' + c.info : ''),
+                        [`st:${st.name}`, `mem:${st.addr}`, ...(S.cache ? ['cache'] : [])]);
                     break;
-                case 'startMemWrite':
+                }
+                case 'forward':
+                    st.stage = 'mem';
+                    st.total = 1;
+                    st.remaining = 1;
+                    st.forwarding = true;
+                    st.forwardValue = extra.forward;
+                    stats.forwarded++;
+                    step(t('tom.forward', { st: st.name, other: extra.from, value: V(extra.forward), addr: A(st.addr) }), [`st:${st.name}`]);
+                    break;
+                case 'startMemWrite': {
+                    const c = cacheLatency(st.addr, cfg.latency.store);
                     st.stage = 'memw';
-                    st.total = latencyOf('store');
+                    st.total = c.latency;
                     st.remaining = st.total;
+                    if (c.info) step(t('tom.startStore', { st: st.name, addr: A(st.addr) }) + ' ' + c.info, [`st:${st.name}`, 'cache']);
                     break;
+                }
                 case 'storeReady':
                     st.stage = 'done';
                     st.doneAt = S.cycle;
                     d.execEnd = S.cycle;
-                    step(`**${st.name}** recebeu o valor a armazenar (${v(st.Vk)}); ${code(inst)} está pronta para ir ao ROB.`, [`st:${st.name}`]);
+                    step(t('tom.storeReady', { st: st.name, value: V(st.Vk), inst: code(inst) }), [`st:${st.name}`]);
                     continue;
             }
             // Avança um ciclo da operação em andamento.
             st.remaining--;
             mark(d, st.stage === 'memw' ? 'Write' : (st.stage === 'mem' ? 'Mem' : 'Exec'));
             if (st.remaining > 0) {
-                progress.push(`**${st.name}** (${st.total - st.remaining} de ${st.total})`);
+                progress.push(st.name);
                 continue;
             }
             switch (st.stage) {
@@ -510,7 +559,7 @@ export function simulate(program, userConfig = {}) {
                     st.stage = 'done';
                     st.doneAt = S.cycle;
                     d.execEnd = S.cycle;
-                    step(`**${st.name}** termina a execução de ${code(inst)}: ${r}.`, [`st:${st.name}`]);
+                    step(t('tom.endExec', { st: st.name, inst: code(inst), result: r }), [`st:${st.name}`]);
                     break;
                 }
                 case 'addr':
@@ -518,30 +567,36 @@ export function simulate(program, userConfig = {}) {
                     d.addr = st.addr;
                     st.stage = 'addrDone';
                     st.addrAt = S.cycle;
-                    step(`**${st.name}** calcula o endereço efetivo de ${code(inst)}: ${fmt.value(st.Vj)} + ${inst.imm} = ${v(fmt.address(st.addr))}.`, [`st:${st.name}`]);
+                    step(t('tom.address', { st: st.name, inst: code(inst), base: fmt.value(st.Vj), off: inst.imm, addr: A(st.addr) }), [`st:${st.name}`]);
                     break;
                 case 'mem':
-                    st.result = { value: memory.load(S.mem, st.addr, inst.def.mem, xlen) };
+                    st.result = { value: st.forwarding ? st.forwardValue : memory.load(S.mem, st.addr, inst.def.mem, xlen) };
                     st.stage = 'done';
                     st.doneAt = S.cycle;
                     d.execEnd = S.cycle;
-                    step(`**${st.name}** lê ${v(st.result.value)} da memória em ${v(fmt.address(st.addr))}.`, [`st:${st.name}`, `mem:${st.addr}`]);
+                    step(t(st.forwarding ? 'tom.forwardDone' : 'tom.loadDone', { st: st.name, value: V(st.result.value), addr: A(st.addr) }),
+                        [`st:${st.name}`, `mem:${st.addr}`]);
                     break;
                 case 'memw': {
                     const value = st.Vk, addr = st.addr;
                     writeMemory(addr, inst.def.mem, value);
                     d.write = S.cycle;
                     Object.assign(st, emptyStation(st.name, st.group, st.classes));
-                    step(`${code(inst)} escreve ${v(value)} na memória em ${v(fmt.address(addr))}; a estação **${st.name}** é liberada.`,
-                        [`st:${st.name}`, `mem:${addr}`]);
+                    step(t('tom.storeDone', { inst: code(inst), value: V(value), addr: A(addr), st: st.name }), [`st:${st.name}`, `mem:${addr}`]);
                     break;
                 }
             }
         }
-        if (progress.length > 0)
-            step(`Em execução: ${progress.join(', ')}.`, progress.map((p) => `st:${p.split('**')[1]}`));
-        if (memWaits.length > 0)
-            step(`Dependência pela memória: ${memWaits.join('; ')}.`, []);
+        S.units = unitsUsed;
+        if (progress.length > 0) {
+            const list = progress.map((n) => {
+                const st = S.stations.find((s) => s.name === n);
+                return t('tom.progressItem', { st: n, done: st.total - st.remaining, total: st.total });
+            });
+            step(t('tom.progress', { list: list.join(', ') }), progress.map((n) => `st:${n}`));
+        }
+        if (waits.length > 0)
+            step(t('tom.waits', { list: waits.join('; ') }), []);
     }
 
     // 4. Issue ----------------------------------------------------------------------------------------------
@@ -550,36 +605,37 @@ export function simulate(program, userConfig = {}) {
         const i = (S.rob.head + S.rob.count) % cfg.robSize;
         S.rob.entries[i] = {
             index: i, dyn: d.id, kind, dest, value: null, ready: false, readyAt: null, issuedAt: S.cycle,
-            addr: null, data: null, taken: null, predicted: null, predictedNext: null, next: null, mispredict: false,
+            addr: null, data: null, taken: null, predicted: null, predictedNext: null, next: null,
+            mispredict: false, recovered: false,
         };
         S.rob.count++;
         d.rob = i;
         return i;
     }
 
+    function newDyn(inst) {
+        const d = {
+            id: dyn.length, index: inst.index, pc: inst.pc, text: inst.text, issue: S.cycle,
+            execStart: null, execEnd: null, write: null, commit: null, squashed: null,
+            station: null, rob: null, addr: null, mispredicted: false, marks: [],
+        };
+        dyn.push(d);
+        stats.issued++;
+        return d;
+    }
+
     function issueOne(inst) {
         const def = inst.def;
         const robFull = speculative && S.rob.count >= cfg.robSize;
-
-        const newDyn = () => {
-            const d = {
-                id: dyn.length, index: inst.index, pc: inst.pc, text: inst.text, issue: S.cycle,
-                execStart: null, execEnd: null, write: null, commit: null, squashed: null,
-                station: null, rob: null, addr: null, mispredicted: false, marks: [],
-            };
-            dyn.push(d);
-            stats.issued++;
-            return d;
-        };
 
         // Instruções de sistema e saltos incondicionais sem retorno não ocupam estação de reserva.
         if (def.cls === 'system' || (inst.name === 'jal' && inst.rd === 'x0')) {
             if (robFull) {
                 stats.stallRob++;
-                step(`${code(inst)} não pode ser emitida: o ROB está cheio.`, ['rob']);
+                step(t('tom.robFull', { inst: code(inst) }), ['rob']);
                 return false;
             }
-            const d = newDyn();
+            const d = newDyn(inst);
             mark(d, 'Issue');
             if (speculative) {
                 const i = allocRob(d, def.cls === 'system' ? 'system' : 'jump', null);
@@ -588,63 +644,63 @@ export function simulate(program, userConfig = {}) {
             }
             if (def.cls === 'system') {
                 S.fetch.halted = true;
-                step(`${code(inst)} é emitida: a busca de instruções é encerrada e o processador termina quando as instruções em andamento concluírem.`, ['pc']);
+                step(t('tom.issueSystem', { inst: code(inst) }), ['pc']);
                 return false;
             }
             S.pc = inst.target;
-            step(`${code(inst)} é resolvida na emissão (destino conhecido): a busca continua em ${v(fmt.address(S.pc))}.`, ['pc']);
+            step(t('tom.issueJump', { inst: code(inst), addr: A(S.pc) }), ['pc']);
             return true;
         }
 
         const st = S.stations.find((s) => !s.busy && s.classes.includes(def.cls));
         if (!st) {
             stats.stallStructural++;
-            step(`${code(inst)} não pode ser emitida: todas as estações que aceitam "${CLASSES[def.cls]}" estão ocupadas (conflito estrutural).`,
+            step(t('tom.noStation', { inst: code(inst), cls: className(def.cls) }),
                 S.stations.filter((s) => s.classes.includes(def.cls)).map((s) => `st:${s.name}`));
             return false;
         }
         if (robFull) {
             stats.stallRob++;
-            step(`${code(inst)} não pode ser emitida: o ROB está cheio.`, ['rob']);
+            step(t('tom.robFull', { inst: code(inst) }), ['rob']);
             return false;
         }
 
-        const d = newDyn();
+        const d = newDyn(inst);
         d.station = st.name;
         const dest = inst.rd !== null && inst.rd !== 'x0' ? inst.rd : null;
 
         Object.assign(st, {
             busy: true, dyn: d.id, op: inst.name, cls: def.cls, issuedAt: S.cycle, stage: 'issued',
-            imm: inst.imm, kImm: false, jUsed: inst.rs1 !== null, kUsed: inst.rs2 !== null,
+            imm: inst.imm, kImm: false, jUsed: inst.rs1 !== null, kUsed: inst.rs2 !== null, mUsed: inst.rs3 !== null,
         });
 
         // Leitura dos operandos (antes de marcar o destino, para casos como addi a0, a0, 4).
         const opMsgs = [];
         const srcFocus = [];
         const setOperand = (side, reg) => {
-            const V = side === 'j' ? 'Vj' : 'Vk', Q = side === 'j' ? 'Qj' : 'Qk', at = side === 'j' ? 'jReadyAt' : 'kReadyAt';
-            const label = side === 'j' ? 'Vj' : 'Vk';
+            const Vn = `V${side}`, Qn = `Q${side}`, at = `${side}ReadyAt`;
             const r = readOperand(reg);
-            if (r === null) { st[V] = null; st[Q] = null; st[at] = 0; return; }
+            if (r === null) { st[Vn] = null; st[Qn] = null; st[at] = 0; return; }
             srcFocus.push(`reg:${reg}`);
-            if (r.tag !== undefined && r.value === undefined) {
-                st[Q] = r.tag; st[V] = null; st[at] = Infinity;
-                opMsgs.push(`${label} aguarda ${regName(reg)}, que será produzido por **${r.tag}**`);
+            if (r.value === undefined) {
+                st[Qn] = r.tag; st[Vn] = null; st[at] = Infinity;
+                opMsgs.push(t('tom.opWait', { side: Vn, reg: R(reg), tag: r.tag }));
             } else {
-                st[V] = r.value; st[Q] = null; st[at] = S.cycle + 1;
-                const src = r.from === 'rob' ? `já pronto no ROB **${r.tag}**` : (r.from === 'x0' ? 'x0 vale sempre zero' : 'disponível no banco de registradores');
-                opMsgs.push(`${label} = ${v(r.value)} (${regName(reg)}, ${src})`);
+                st[Vn] = r.value; st[Qn] = null; st[at] = S.cycle + 1;
+                const src = r.from === 'rob' ? t('tom.srcRob', { tag: r.tag }) : t(r.from === 'x0' ? 'tom.srcZero' : 'tom.srcReg');
+                opMsgs.push(t('tom.opValue', { side: Vn, value: V(r.value), reg: R(reg), src }));
             }
         };
         setOperand('j', inst.rs1);
         setOperand('k', inst.rs2);
+        setOperand('m', inst.rs3);
         if (inst.rs2 === null && !MEM_CLASSES.has(def.cls) && ['I', 'SH', 'U', 'J', 'JR'].includes(def.fmt)) {
             st.Vk = BigInt(inst.imm);
             st.kImm = true;
-            if (def.fmt !== 'J' && def.fmt !== 'U' && def.fmt !== 'JR') opMsgs.push(`Vk recebe o imediato ${v(BigInt(inst.imm))}`);
+            if (def.fmt === 'I' || def.fmt === 'SH') opMsgs.push(t('tom.opImm', { value: V(BigInt(inst.imm)) }));
         }
         if (MEM_CLASSES.has(def.cls))
-            opMsgs.push(`A recebe o deslocamento ${v(BigInt(inst.imm))}`);
+            opMsgs.push(t('tom.opOffset', { value: V(BigInt(inst.imm)) }));
 
         let robIdx = null;
         if (speculative) {
@@ -654,18 +710,18 @@ export function simulate(program, userConfig = {}) {
         }
 
         mark(d, 'Issue');
-        const where = speculative ? `na estação **${st.name}** e na entrada **${robTag(robIdx)}** do ROB` : `na estação de reserva **${st.name}**`;
-        step(`${code(inst)} é emitida ${where}.`, [`st:${st.name}`, 'queue', ...(speculative ? [`rob:${robIdx}`] : [])]);
+        step(speculative
+            ? t('tom.issueRob', { inst: code(inst), st: st.name, tag: robTag(robIdx) })
+            : t('tom.issue', { inst: code(inst), st: st.name }),
+        [`st:${st.name}`, 'queue', ...(speculative ? [`rob:${robIdx}`] : [])]);
         if (opMsgs.length > 0)
-            step(`Operandos de **${st.name}**: ${opMsgs.join('; ')}.`, [`st:${st.name}`, ...srcFocus]);
+            step(t('tom.operands', { st: st.name, list: opMsgs.join('; ') }), [`st:${st.name}`, ...srcFocus]);
 
         if (dest !== null) {
             const tag = speculative ? robTag(robIdx) : st.name;
             const previous = S.status[dest];
             S.status[dest] = tag;
-            step(`${regName(dest)} passa a aguardar o resultado de **${tag}**` +
-                (previous !== undefined ? ` (renomeação: o produtor anterior, **${previous}**, deixa de atualizar o registrador)` : '') + '.',
-                [`reg:${dest}`]);
+            step(t(previous !== undefined ? 'tom.renameAgain' : 'tom.rename', { reg: R(dest), tag, previous }), [`reg:${dest}`]);
         }
 
         // Controle de fluxo
@@ -675,12 +731,12 @@ export function simulate(program, userConfig = {}) {
                 e.predicted = predict(inst);
                 e.predictedNext = e.predicted ? inst.target : inst.pc + 4;
                 S.pc = e.predictedNext;
-                step(`Previsão de desvio (${cfg.predictor}): ${e.predicted ? 'tomado' : 'não tomado'}. A busca continua especulativamente em ${v(fmt.address(S.pc))}.`, ['pc']);
-            } else {
-                S.fetch.stall = { dyn: d.id };
-                step(`Sem especulação, nenhuma instrução é emitida até ${code(inst)} ser resolvida.`, ['pc']);
+                step(t('tom.predict', { predictor: t(`predictor.${cfg.predictor}`), dir: taken(e.predicted), addr: A(S.pc) }), ['pc']);
+                return true;
             }
-            return !S.fetch.stall;
+            S.fetch.stall = { dyn: d.id };
+            step(t('tom.branchStall', { inst: code(inst) }), ['pc']);
+            return false;
         }
         if (inst.name === 'jal') {
             S.pc = inst.target;
@@ -688,7 +744,7 @@ export function simulate(program, userConfig = {}) {
         }
         if (inst.name === 'jalr') {
             S.fetch.stall = { dyn: d.id };
-            step(`O destino de ${code(inst)} depende de um registrador: a emissão espera o salto ser executado.`, ['pc']);
+            step(t('tom.jalrStall', { inst: code(inst) }), ['pc']);
             return false;
         }
         S.pc += 4;
@@ -699,10 +755,7 @@ export function simulate(program, userConfig = {}) {
         for (let k = 0; k < cfg.issueWidth; k++) {
             if (S.fetch.halted) return;
             if (S.fetch.stall) {
-                if (k === 0) {
-                    const d = dynOf(S.fetch.stall.dyn);
-                    step(`Emissão parada: aguardando a resolução de \`${d.text}\`.`, ['pc']);
-                }
+                if (k === 0) step(t('tom.issueStopped', { inst: `\`${dynOf(S.fetch.stall.dyn).text}\`` }), ['pc']);
                 return;
             }
             if (S.fetch.resumeAt > S.cycle) return;
@@ -714,41 +767,41 @@ export function simulate(program, userConfig = {}) {
 
     // Laço principal ----------------------------------------------------------------------------------------
 
-    const cycles = [snapshot()];
-    const interSteps = [[]];
     const isDone = () =>
         S.stations.every((s) => !s.busy) && (!S.rob || S.rob.count === 0) &&
         (S.fetch.halted || (indexAt(program, S.pc) < 0 && !S.fetch.stall));
 
+    rec.endCycle();
     while (!isDone()) {
         if (S.cycle >= cfg.maxCycles) {
-            warnings.push(`A simulação foi interrompida após ${cfg.maxCycles} ciclos (limite configurado). Aumente o limite ou verifique se há um laço infinito.`);
+            warnings.push(t('common.maxCycles', { n: cfg.maxCycles }));
             break;
         }
         S.cycle++;
         S.cdb = [];
-        steps = [];
+        rec.beginCycle();
         if (speculative) commitPhase();
         writePhase();
         executePhase();
         issuePhase();
-        if (pendingMarks.length > 0) step('Fim do ciclo.');
-        S.focus = [];
-        cycles.push(trace ? snapshot() : null);
-        interSteps.push(steps);
+        rec.endCycle(t('common.endOfCycle'));
     }
-    S.finished = isDone();
 
     const committed = speculative ? stats.committed : stats.issued;
+    if (S.cache) {
+        stats.cacheHits = S.cache.hits;
+        stats.cacheMisses = S.cache.misses;
+    }
     return {
         errors: [],
+        model: cfg.mode,
         config: cfg,
         program,
-        states: cycles,
-        interStates: interSteps,
+        states: rec.states,
+        interStates: rec.interStates,
         dyn,
         warnings,
-        finished: S.finished,
+        finished: isDone(),
         stats: { ...stats, cycles: S.cycle, instructions: committed, ipc: S.cycle > 0 ? committed / S.cycle : 0 },
         final: { x: S.regs.x, f: S.regs.f, mem: S.mem },
     };
@@ -757,8 +810,9 @@ export function simulate(program, userConfig = {}) {
 function emptyStation(name, group, classes) {
     return {
         name, group, classes, busy: false, dyn: null, op: null, cls: null,
-        Vj: null, Vk: null, Qj: null, Qk: null, jReadyAt: 0, kReadyAt: 0, jUsed: false, kUsed: false, kImm: false,
-        imm: null, addr: null, addrAt: null, rob: null,
+        Vj: null, Vk: null, Vm: null, Qj: null, Qk: null, Qm: null, jReadyAt: 0, kReadyAt: 0, mReadyAt: 0,
+        jUsed: false, kUsed: false, mUsed: false, kImm: false,
+        imm: null, addr: null, addrAt: null, rob: null, forwarding: false, forwardValue: null, waitingUnit: false,
         stage: null, remaining: 0, total: 0, result: null, issuedAt: null, doneAt: null,
     };
 }

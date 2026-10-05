@@ -173,3 +173,23 @@ test('chamada e retorno de função', () => {
         fim:`);
     assert.equal(r('x8'), 36n);
 });
+
+test('fmadd arredonda uma única vez', () => {
+    const r = run(`
+        .data
+        a: .float 1.000244140625      # 1 + 2^-12
+        c: .float -1.00048828125      # -(1 + 2^-11)
+        .text
+        la x1, a
+        flw f1, 0(x1)
+        flw f3, 4(x1)
+        fmadd.s f4, f1, f1, f3
+        fmul.s f5, f1, f1
+        fadd.s f6, f5, f3
+        fnmsub.s f7, f1, f1, f3
+        fmsub.d f8, f1, f1, f3`);
+    assert.equal(r('f4'), 2 ** -24, 'resultado fundido exato');
+    assert.equal(r('f6'), 0, 'com dois arredondamentos o resultado se perde');
+    assert.equal(r('f7'), -2 - 2 ** -10, 'fnmsub = -(a*b) + c, arredondado para precisão simples');
+    assert.equal(r('f8'), 1.000244140625 ** 2 + 1.00048828125);
+});

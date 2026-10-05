@@ -42,6 +42,7 @@ export function generate(seed) {
         const fd = pick(FR), fa = pick(FR), fb = pick(FR);
         if (k < 0.90) return `${pick(['fadd.s', 'fsub.s', 'fmul.s', 'fdiv.s', 'fmin.s', 'fmax.s', 'fsgnjx.s'])} ${fd}, ${fa}, ${fb}`;
         if (k < 0.93) return `${pick(['feq.s', 'flt.s', 'fle.s'])} ${rd}, ${fa}, ${fb}`;
+        if (k < 0.945) return `${pick(['fmadd.s', 'fmsub.s', 'fnmadd.s', 'fnmsub.s'])} ${fd}, ${fa}, ${fb}, ${pick(FR)}`;
         if (k < 0.96) return `fcvt.w.s ${rd}, ${fa}, rtz`;
         if (k < 0.98) return `fmv.x.w ${rd}, ${fa}`;
         return `fsqrt.s ${fd}, ${fa}`;

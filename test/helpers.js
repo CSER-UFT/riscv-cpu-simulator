@@ -38,6 +38,24 @@ export const CONFIGS = {
             { name: 'FMul', count: 2, classes: ['fmul', 'fdiv'] },
         ],
     },
+    'clássico, unidades compartilhadas e cache': {
+        mode: 'classic', issueWidth: 2, storeForwarding: true,
+        cache: { enabled: true, size: 64, blockSize: 8, assoc: 2, hitLatency: 1, missLatency: 6 },
+        groups: [
+            { name: 'Load', count: 4, classes: ['load', 'store'], units: 1, pipelined: true },
+            { name: 'Add', count: 4, classes: ['alu', 'branch', 'jump', 'fadd'], units: 1, pipelined: false },
+            { name: 'Mul', count: 3, classes: ['mul', 'div', 'fmul', 'fdiv'], units: 1, pipelined: false },
+        ],
+    },
+    'ROB, encaminhamento e recuperação na execução': {
+        mode: 'rob', predictor: 'taken', storeForwarding: true, recovery: 'write', robSize: 12, issueWidth: 2, commitWidth: 2,
+        cache: { enabled: true, size: 32, blockSize: 4, assoc: 1, hitLatency: 2, missLatency: 9 },
+        groups: [
+            { name: 'Load', count: 3, classes: ['load', 'store'], units: 2, pipelined: false },
+            { name: 'Int', count: 3, classes: ['alu', 'branch', 'jump', 'mul', 'div'], units: 2, pipelined: true },
+            { name: 'FP', count: 3, classes: ['fadd', 'fmul', 'fdiv'], units: 1, pipelined: true },
+        ],
+    },
     'ROB BTFN, latências altas': {
         mode: 'rob', predictor: 'btfn', issueWidth: 2, commitWidth: 2,
         latency: { address: 3, load: 5, alu: 3, branch: 4, jump: 2, mul: 9, div: 20, fadd: 6, fmul: 8, fdiv: 15 },
