@@ -1,0 +1,13 @@
+{
+  "name": "riscv-simulator-tomasulo",
+  "private": true,
+  "description": "Simulador didático do algoritmo de Tomasulo para RISC-V",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "python3 -m http.server 8000"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
