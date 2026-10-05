@@ -1739,3 +1739,21 @@ td.on {
 table.levels input[type='number'] {
     width: 70px;
 }
+
+.panel table.perf {
+    width: 100%;
+}
+
+.panel table.perf th,
+.panel table.perf td {
+    white-space: normal;
+}
+
+.panel table.perf tr.total th,
+.panel table.perf tr.total td {
+    border-top: 1px solid var(--line-strong);
+}
+
+.panel table.perf td.num {
+    white-space: nowrap;
+}

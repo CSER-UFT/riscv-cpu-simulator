@@ -3,6 +3,7 @@
  */
 import { t } from '../i18n/index.js';
 import { className } from '../core/config.js';
+import { clockPeriod } from '../core/timing.js';
 
 export function configSummary(cfg) {
     const items = [t(`mode.${cfg.mode}`), `RV${cfg.xlen}`];
@@ -26,6 +27,9 @@ export function configSummary(cfg) {
             items.push(t(cfg.recovery === 'write' ? 'summary.recoveryWrite' : 'summary.recoveryCommit'));
         }
     }
+    items.push(cfg.timing.mode === 'fixed'
+        ? t('summary.clockFixed', { f: cfg.timing.freqGHz })
+        : t('summary.clockDerived', { ps: Math.round(clockPeriod(cfg).periodPs) }));
     if (cfg.memory.enabled) {
         for (const [name, l] of Object.entries(cfg.memory.levels))
             if (l.enabled) items.push(t('summary.level', { name, size: l.size, block: l.blockSize, assoc: l.assoc, lat: l.latency }));

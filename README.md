@@ -21,11 +21,15 @@ No Tomasulo são configuráveis os grupos de estações (nome, quantidade e clas
 
 O pipeline e o Tomasulo podem usar uma hierarquia com L1 de instruções (L1I), L1 de dados (L1D), L2 e L3 compartilhadas e memória principal. Cada nível pode ser ligado ou desligado e tem tamanho, bloco, associatividade e latência de acesso configuráveis, com substituição LRU, alocação na escrita e preenchimento inclusivo (o bloco é colocado em todos os níveis por onde o acesso passou). A latência de um acesso é a soma das latências dos níveis consultados até o acerto, mais a da memória principal se todos falharem; sem L1I, a busca de instruções é ideal. O painel mostra o conteúdo de cada nível, o último acesso e as taxas de acerto, e as estatísticas incluem o tempo médio de acesso. No monociclo, que tem CPI 1 por definição, a hierarquia só gera estatísticas. Configurações antigas com uma única cache de dados continuam aceitas.
 
+## Tempo de execução
+
+Como o ciclo do monociclo executa uma instrução inteira e o do pipeline e do Tomasulo só um estágio, comparar por ciclos não basta. O simulador calcula o tempo de execução (instruções × CPI × período). O período vem dos atrasos dos componentes (padrão do Patterson e Hennessy: 200, 100, 200, 200 e 100 ps, mais 20 ps do registrador de pipeline) ou de uma frequência digitada. No monociclo, o período cobre a instrução mais lenta do conjunto de instruções, com a execução de uma classe de latência L custando L vezes o atraso da ALU; no pipeline e no Tomasulo, é o estágio mais lento mais o registrador de pipeline, com uma sobrecarga opcional de escalonamento no Tomasulo.
+
 ## Recursos para aula
 
 * **Passo a passo**: cada ciclo é dividido em passos com uma explicação do que acontece, e a linha do tempo mostra o estágio de cada instrução em cada ciclo.
 * **Exercício**: o aluno preenche, para cada instrução, o ciclo de cada evento (Issue, início e fim da execução, Write e Commit no Tomasulo; IF, ID, EX, MEM e WB no pipeline) e o simulador corrige. O link copiado de um exercício abre diretamente nele.
-* **Comparar**: executa o mesmo programa com outra configuração e mostra estatísticas, diferenças de configuração e as duas linhas do tempo lado a lado.
+* **Comparar**: executa o mesmo programa com outra configuração e mostra o speedup pelo tempo de execução, decomposto em CPI e período do clock, além das estatísticas, das diferenças de configuração e das duas linhas do tempo lado a lado.
 * **Exportar**: linha do tempo e tabela de eventos em CSV e em LaTeX, inclusive a tabela em branco para provas e listas. As tabelas LaTeX usam cabeçalho com fundo `tabAzul` e texto branco, `\hline` e não usam booktabs.
 * **Copiar link**: gera um endereço que abre a mesma simulação, comparação ou exercício.
 
@@ -77,6 +81,7 @@ js/models/pipeline.js    pipeline de 5 estágios
 js/models/tomasulo.js    Tomasulo clássico e com ROB
 js/core/config.js        configuração padrão e validação (todos os modelos)
 js/core/recorder.js      passos, linha do tempo e instantâneos com compartilhamento estrutural
+js/core/timing.js        período do clock e tempo de execução
 js/i18n/                 textos da interface em português e inglês
 js/help/                 ajuda (manual do usuário) em português e inglês
 js/ui/                   interface: diagramas, linha do tempo, editor, exercício, comparação, exportação

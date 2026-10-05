@@ -242,6 +242,25 @@ export default {
 <p>Nas estatísticas aparecem a taxa de acerto de cada nível e o tempo médio de acesso a dados e de busca de instruções (AMAT), em ciclos.</p>`,
         },
         {
+            id: 'performance',
+            title: 'Desempenho e tempo de execução',
+            html: `
+<p>Comparar processadores pelo número de ciclos só é justo quando o ciclo dos dois tem a mesma duração. Não é o caso entre o monociclo, cujo ciclo executa uma instrução inteira, e o pipeline ou o Tomasulo, cujo ciclo executa só um estágio. Por isso o simulador calcula o <strong>tempo de execução</strong>:</p>
+<p class="tip"><strong>Tempo = instruções × CPI × período do clock</strong></p>
+<h3>Período do clock</h3>
+<p>Em <em>Tempo de ciclo</em>, na configuração, o período pode ser calculado a partir dos atrasos dos componentes (padrão) ou vir de uma frequência digitada. Os atrasos padrão são os do Patterson e Hennessy: memória de instruções 200 ps, leitura de registradores 100 ps, ALU 200 ps, memória de dados 200 ps, escrita de registradores 100 ps, mais 20 ps do registrador de pipeline.</p>
+<ul>
+    <li><strong>Monociclo</strong>: o período é o caminho da instrução mais lenta do <em>conjunto de instruções</em>, pois o hardware precisa executar qualquer uma delas em um ciclo, mesmo que o programa não a use. A execução de uma classe com latência <em>L</em> custa <em>L</em> vezes o atraso da ALU. Com a divisão de latência 10, o período é 200 + 100 + 10 × 200 + 100 = 2400 ps; com todas as latências iguais a 1, a mais lenta é o load e o período é 800 ps, como no livro.</li>
+    <li><strong>Pipeline</strong>: o estágio mais lento mais o registrador de pipeline: 200 + 20 = 220 ps.</li>
+    <li><strong>Tomasulo</strong>: como o pipeline, mais uma sobrecarga opcional que representa a lógica de escalonamento (despertar das estações e disputa pelo CDB).</li>
+</ul>
+<p>O período, a frequência, o tempo de execução e o caminho que define o período aparecem nas estatísticas e são mostrados também no editor, à medida que a configuração muda.</p>
+<h3>Na comparação</h3>
+<p>O resultado principal é o speedup pelo tempo de execução, decomposto nos fatores da equação: a razão dos CPIs e a razão dos períodos (e a das instruções, se diferirem). Assim fica visível, por exemplo, que o Tomasulo perde no CPI para o monociclo, mas ganha no período. A razão de ciclos continua informada, como referência. A comparação avisa quando só um dos lados usa a hierarquia de memória, quando o monociclo é comparado com a hierarquia ligada (nele a memória é ideal) e quando a mesma frequência foi digitada para um monociclo e um modelo de estágios.</p>
+<h3>O que o modelo não considera</h3>
+<p>O período não varia com o programa nem com a temperatura ou a tensão; o custo de área e de energia não é modelado; e o tempo das caches é dado em ciclos de estágio, independente dos atrasos.</p>`,
+        },
+        {
             id: 'config',
             title: 'Configuração',
             html: `
@@ -275,9 +294,11 @@ export default {
     <tr><td>PF div</td><td>divisão e raiz quadrada</td></tr>
 </table>
 <h3>Latências</h3>
-<p>Ciclos de execução de cada classe. <em>Cálculo de endereço</em>, <em>Acesso à memória</em> e <em>Escrita na memória</em> valem só para o Tomasulo; os dois últimos são substituídos pela hierarquia de memória quando ela está ligada. No pipeline, a latência é o tempo que a instrução passa no EX.</p>
+<p>Ciclos de execução de cada classe. No monociclo, as latências não mudam o número de ciclos, mas definem o período do clock. <em>Cálculo de endereço</em>, <em>Acesso à memória</em> e <em>Escrita na memória</em> valem só para o Tomasulo; os dois últimos são substituídos pela hierarquia de memória quando ela está ligada. No pipeline, a latência é o tempo que a instrução passa no EX.</p>
 <h3>Hierarquia de memória</h3>
 <p>Ver <a href="#h-memory">Hierarquia de memória</a>.</p>
+<h3>Tempo de ciclo</h3>
+<p>Período do clock calculado pelos atrasos dos componentes (memória de instruções, leitura de registradores, ALU, memória de dados, escrita de registradores, registrador de pipeline e sobrecarga do escalonamento do Tomasulo) ou dado por uma frequência em GHz. Ver <a href="#h-performance">Desempenho e tempo de execução</a>.</p>
 <h3>Simulação</h3>
 <ul>
     <li><strong>Limite de ciclos</strong>: interrompe programas longos ou laços infinitos, com aviso.</li>
@@ -347,7 +368,7 @@ laco:
 </table>
 <p><strong>Corrigir</strong> pinta de verde os acertos e de vermelho os erros e mostra a pontuação; <strong>Mostrar resposta</strong> preenche em azul o que estava errado ou vazio; <strong>Limpar</strong> apaga tudo. Também é possível exportar a tabela em branco e o gabarito em LaTeX. Para distribuir o exercício, use <strong>Copiar link</strong> na aba do exercício: o link abre diretamente nele. As convenções de temporização estão em <a href="#h-timing">Convenções de temporização</a>.</p>
 <h3>Comparar</h3>
-<p>Com uma simulação aberta (configuração A), <strong>Comparar</strong> abre o editor com o mesmo programa travado para escolher a configuração B. O resultado mostra as estatísticas lado a lado, quantas vezes B é mais rápida ou mais lenta que A (pela razão entre os ciclos), as diferenças de configuração e as duas linhas do tempo. Bons usos: com e sem encaminhamento, pipeline contra Tomasulo, CDB 1 contra 2, preditores diferentes, cache maior ou com mais vias.</p>
+<p>Com uma simulação aberta (configuração A), <strong>Comparar</strong> abre o editor com o mesmo programa travado para escolher a configuração B. O resultado mostra quantas vezes B é mais rápida ou mais lenta que A pelo tempo de execução, decomposto em CPI e período do clock (ver <a href="#h-performance">Desempenho e tempo de execução</a>), as estatísticas lado a lado, as diferenças de configuração e as duas linhas do tempo. Bons usos: com e sem encaminhamento, pipeline contra Tomasulo, CDB 1 contra 2, preditores diferentes, cache maior ou com mais vias.</p>
 <h3>Exportar</h3>
 <ul>
     <li><strong>Linha do tempo</strong>, em CSV ou LaTeX: uma linha por instrução e uma coluna por ciclo.</li>
@@ -369,6 +390,7 @@ laco:
     <tr><td>Ciclos</td><td>duração total</td></tr>
     <tr><td>Instruções concluídas</td><td>instruções que terminaram (sem contar as descartadas)</td></tr>
     <tr><td>IPC e CPI</td><td>instruções por ciclo e ciclos por instrução</td></tr>
+    <tr><td>Período, frequência e tempo de execução</td><td>duração do ciclo, sua inversa e ciclos vezes período; abaixo da tabela aparece o caminho que define o período</td></tr>
     <tr><td>Desvios condicionais e previsões erradas</td><td>desvios executados e quantos foram previstos errado</td></tr>
     <tr><td>Instruções descartadas</td><td>buscadas ou emitidas no caminho errado</td></tr>
     <tr><td>Paradas por dependência de dados</td><td>pipeline: ciclos com uma instrução parada em ID esperando um operando</td></tr>

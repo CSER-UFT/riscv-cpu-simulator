@@ -30,6 +30,11 @@ export const DEFAULT_CONFIG = {
     storeForwarding: false,
     recovery: 'commit',
     pipeline: { forwarding: true, branchStage: 'EX' },
+    timing: {
+        mode: 'derived',
+        freqGHz: 1,
+        delays: { imem: 200, regRead: 100, alu: 200, dmem: 200, regWrite: 100, latch: 20, scheduler: 0 },
+    },
     memory: {
         enabled: false,
         mainLatency: 40,
@@ -95,6 +100,20 @@ function normalizeMemory(partial) {
     return { enabled: bool(pm.enabled, d.enabled), mainLatency: intIn(pm.mainLatency, 1, 10000, d.mainLatency), levels };
 }
 
+/** Normaliza o modelo de tempo de ciclo. Atrasos em picossegundos. */
+function normalizeTiming(pt = {}) {
+    const d = DEFAULT_CONFIG.timing;
+    const delays = {};
+    for (const [k, v] of Object.entries(d.delays))
+        delays[k] = intIn(pt.delays?.[k], k === 'latch' || k === 'scheduler' ? 0 : 1, 100000, v);
+    const f = Number(pt.freqGHz);
+    return {
+        mode: pt.mode === 'fixed' ? 'fixed' : 'derived',
+        freqGHz: Number.isFinite(f) && f > 0 && f <= 100 ? f : d.freqGHz,
+        delays,
+    };
+}
+
 /**
  * Completa uma configuração parcial com os valores padrão e normaliza os campos.
  * @returns {{config: object, errors: string[]}}
@@ -122,6 +141,7 @@ export function normalizeConfig(partial = {}) {
             branchStage: pp.branchStage === 'ID' ? 'ID' : 'EX',
         },
         memory: normalizeMemory(partial),
+        timing: normalizeTiming(partial.timing),
         latency: {},
         groups: [],
     };

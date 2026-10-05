@@ -6,6 +6,8 @@ import { EXAMPLES, exampleName } from '../examples.js';
 import { t } from '../i18n/index.js';
 import { DEFAULT_CONFIG, MODE_IDS, PREDICTOR_IDS, LATENCY_IDS, STATION_CLASSES, className, normalizeConfig } from '../core/config.js';
 import { highlight } from './highlight.js';
+import { clockPeriod } from '../core/timing.js';
+import { criticalPathText, fmtNum } from './panels.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c]);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -180,16 +182,17 @@ export class Editor {
         const c = { ...clone(DEFAULT_CONFIG), ...clone(config) };
         c.latency = { ...DEFAULT_CONFIG.latency, ...(config.latency ?? {}) };
         c.memory = normalizeConfig(config).config.memory;
+        c.timing = normalizeConfig(config).config.timing;
         c.pipeline = { ...DEFAULT_CONFIG.pipeline, ...(config.pipeline ?? {}) };
         const opt = (pairs, cur) => pairs.map(([k, v]) => `<option value="${k}" ${String(k) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
         const num = (name, value, min, max, label, cls = '') =>
-            `<label class="field ${cls}">${label}<input type="number" name="${name}" value="${value}" min="${min}" max="${max}" /></label>`;
+            `<label class="field ${cls}">${label}<input type="number" name="${name}" value="${value}" min="${min}" max="${max}" step="any" /></label>`;
         const check = (name, value, label, cls = '') =>
             `<label class="field check ${cls}"><input type="checkbox" name="${name}" ${value ? 'checked' : ''} />${label}</label>`;
 
         const groups = c.groups.map((g) => this.groupRow(g)).join('');
         const lat = LATENCY_IDS.map((k) => {
-            const cls = ['address', 'load', 'store'].includes(k) ? 'tom-only' : 'not-single';
+            const cls = ['address', 'load', 'store'].includes(k) ? 'tom-only' : '';
             return `<label class="field small ${cls}"><span>${esc(['address', 'load', 'store'].includes(k) ? t(`latency.${k}`) : className(k))}</span><input type="number" name="lat-${k}" value="${c.latency[k]}" min="1" max="100" /></label>`;
         }).join('');
 
@@ -213,7 +216,7 @@ export class Editor {
                 <button type="button" class="btn small" data-action="add-group">${t('ed.addGroup')}</button>
                 <p class="note">${t('ed.unitsHelp')}</p>
             </fieldset>
-            <fieldset class="not-single"><legend>${t('ed.latencies')}</legend><div class="latencies">${lat}</div></fieldset>
+            <fieldset><legend>${t('ed.latencies')}</legend><div class="latencies">${lat}</div></fieldset>
             <fieldset><legend>${t('ed.memory')}</legend>
                 ${check('memEnabled', c.memory.enabled, t('ed.memoryEnabled'))}
                 <div class="mem-fields">
@@ -229,6 +232,15 @@ export class Editor {
                     <p class="note">${t('ed.memoryHelp')}</p>
                 </div>
             </fieldset>
+            <fieldset><legend>${t('ed.timing')}</legend>
+                <label class="field">${t('ed.timingMode')}<select name="timingMode">${opt([['derived', t('ed.timingDerived')], ['fixed', t('ed.timingFixed')]], c.timing.mode)}</select></label>
+                <div class="timing-fixed">${num('freqGHz', c.timing.freqGHz, 0.001, 100, t('ed.freqGHz'))}</div>
+                <div class="timing-derived latencies">
+                    ${Object.keys(c.timing.delays).map((k) => num(`d-${k}`, c.timing.delays[k], 0, 100000, t(`ed.delay.${k}`), `small ${k === 'scheduler' ? 'tom-only' : ''}`)).join('')}
+                </div>
+                <p class="note timing-result"></p>
+                <p class="note">${t('ed.timingHelp')}</p>
+            </fieldset>
             <fieldset><legend>${t('ed.simulation')}</legend>
                 ${num('maxCycles', c.maxCycles, 1, 100000, t('ed.maxCycles'))}
                 ${num('queueSize', c.queueSize, 1, 32, t('ed.queueSize'), 'tom-only')}
@@ -242,6 +254,8 @@ export class Editor {
         });
         this.configEl.querySelector('select[name="mode"]').addEventListener('change', () => this.updateModeFields());
         this.configEl.querySelector('[name="memEnabled"]').addEventListener('change', () => this.updateModeFields());
+        this.configEl.querySelector('[name="timingMode"]').addEventListener('change', () => this.updateModeFields());
+        this.configEl.addEventListener('input', () => this.updateTiming());
         this.bindGroupRows();
         this.updateModeFields();
     }
@@ -275,8 +289,20 @@ export class Editor {
         for (const [cls, visible] of Object.entries(show))
             for (const el of this.configEl.querySelectorAll(`.${cls}`))
                 el.classList.toggle('hidden', !visible);
+        const fixed = this.configEl.querySelector('[name="timingMode"]').value === 'fixed';
+        this.configEl.querySelector('.timing-fixed').classList.toggle('hidden', !fixed);
+        this.configEl.querySelector('.timing-derived').classList.toggle('hidden', fixed);
+        this.updateTiming();
         const memOn = this.configEl.querySelector('[name="memEnabled"]').checked;
         this.configEl.querySelector('.mem-fields').classList.toggle('hidden', !memOn);
+    }
+
+    /** Mostra o período resultante da configuração do formulário. */
+    updateTiming() {
+        const el = this.configEl.querySelector('.timing-result');
+        if (!el) return;
+        const clk = clockPeriod(normalizeConfig(this.readConfig()).config);
+        el.innerHTML = `<b>${t('ed.timingResult', { ps: fmtNum(clk.periodPs, 0), f: fmtNum(clk.freqGHz, 2) })}</b> ${esc(criticalPathText(clk))}`;
     }
 
     readConfig() {
@@ -298,6 +324,11 @@ export class Editor {
             storeForwarding: get('storeForwarding').checked,
             recovery: get('recovery').value,
             pipeline: { forwarding: get('pipeForwarding').checked, branchStage: get('branchStage').value },
+            timing: {
+                mode: get('timingMode').value,
+                freqGHz: Number(get('freqGHz').value),
+                delays: Object.fromEntries(['imem', 'regRead', 'alu', 'dmem', 'regWrite', 'latch', 'scheduler'].map((k) => [k, n(`d-${k}`)])),
+            },
             memory: {
                 enabled: get('memEnabled').checked,
                 mainLatency: n('mainLatency'),

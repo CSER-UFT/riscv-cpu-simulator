@@ -242,6 +242,25 @@ export default {
 <p>The statistics include the hit rate of each level and the average data access and instruction fetch times (AMAT), in cycles.</p>`,
         },
         {
+            id: 'performance',
+            title: 'Performance and execution time',
+            html: `
+<p>Comparing processors by cycle count is only fair when both cycles take the same time. That is not the case between the single cycle model, whose cycle runs a whole instruction, and the pipeline or Tomasulo, whose cycle runs only one stage. So the simulator computes the <strong>execution time</strong>:</p>
+<p class="tip"><strong>Time = instructions × CPI × clock period</strong></p>
+<h3>Clock period</h3>
+<p>Under <em>Cycle time</em>, in the configuration, the period can be computed from component delays (default) or come from a typed frequency. The default delays are those of Patterson and Hennessy: instruction memory 200 ps, register read 100 ps, ALU 200 ps, data memory 200 ps, register write 100 ps, plus 20 ps for the pipeline register.</p>
+<ul>
+    <li><strong>Single cycle</strong>: the period is the path of the slowest instruction of the <em>instruction set</em>, since the hardware must run any of them in one cycle, even if the program does not use it. Executing a class with latency <em>L</em> costs <em>L</em> times the ALU delay. With a divide latency of 10, the period is 200 + 100 + 10 × 200 + 100 = 2400 ps; with every latency equal to 1, the slowest is the load and the period is 800 ps, as in the book.</li>
+    <li><strong>Pipeline</strong>: the slowest stage plus the pipeline register: 200 + 20 = 220 ps.</li>
+    <li><strong>Tomasulo</strong>: like the pipeline, plus an optional overhead standing for the scheduling logic (station wakeup and CDB arbitration).</li>
+</ul>
+<p>The period, frequency, execution time and the path that sets the period appear in the statistics, and the editor shows the period as the configuration changes.</p>
+<h3>In comparisons</h3>
+<p>The main result is the speedup by execution time, split into the factors of the equation: the CPI ratio and the period ratio (and the instruction ratio, if they differ). This shows, for example, that Tomasulo loses to the single cycle model on CPI but wins on the period. The cycle ratio is still reported, for reference. The comparison warns when only one side uses the memory hierarchy, when the single cycle model is compared with the hierarchy enabled (its memory is ideal) and when the same frequency was typed for a single cycle and a staged model.</p>
+<h3>What the model leaves out</h3>
+<p>The period does not change with the program, temperature or voltage; area and energy are not modeled; and cache times are given in stage cycles, independent of the delays.</p>`,
+        },
+        {
             id: 'config',
             title: 'Configuration',
             html: `
@@ -275,9 +294,11 @@ export default {
     <tr><td>FP div</td><td>division and square root</td></tr>
 </table>
 <h3>Latencies</h3>
-<p>Execution cycles of each class. <em>Address calculation</em>, <em>Memory access</em> and <em>Memory write</em> only apply to Tomasulo; the last two are replaced by the memory hierarchy when it is enabled. On the pipeline, the latency is the time the instruction spends in EX.</p>
+<p>Execution cycles of each class. In the single cycle model, latencies do not change the cycle count, but they set the clock period. <em>Address calculation</em>, <em>Memory access</em> and <em>Memory write</em> only apply to Tomasulo; the last two are replaced by the memory hierarchy when it is enabled. On the pipeline, the latency is the time the instruction spends in EX.</p>
 <h3>Memory hierarchy</h3>
 <p>See <a href="#h-memory">Memory hierarchy</a>.</p>
+<h3>Cycle time</h3>
+<p>Clock period computed from component delays (instruction memory, register read, ALU, data memory, register write, pipeline register and Tomasulo scheduling overhead) or given as a frequency in GHz. See <a href="#h-performance">Performance and execution time</a>.</p>
 <h3>Simulation</h3>
 <ul>
     <li><strong>Cycle limit</strong>: stops long programs or infinite loops, with a warning.</li>
@@ -347,7 +368,7 @@ loop:
 </table>
 <p><strong>Check</strong> paints correct answers green and wrong ones red and shows the score; <strong>Show answer</strong> fills in blue what was wrong or empty; <strong>Clear</strong> erases everything. You can also export the blank table and the answer key as LaTeX. To hand out the exercise, use <strong>Copy link</strong> on the exercise tab: the link opens directly in it. Timing rules are in <a href="#h-timing">Timing conventions</a>.</p>
 <h3>Compare</h3>
-<p>With a simulation open (configuration A), <strong>Compare</strong> opens the editor with the same program locked so you can choose configuration B. The result shows the statistics side by side, how many times B is faster or slower than A (by the ratio of cycles), the configuration differences and both timelines. Good uses: with and without forwarding, pipeline against Tomasulo, 1 CDB against 2, different predictors, a larger cache or one with more ways.</p>
+<p>With a simulation open (configuration A), <strong>Compare</strong> opens the editor with the same program locked so you can choose configuration B. The result shows how many times B is faster or slower than A by execution time, split into CPI and clock period (see <a href="#h-performance">Performance and execution time</a>), the statistics side by side, the configuration differences and both timelines. Good uses: with and without forwarding, pipeline against Tomasulo, 1 CDB against 2, different predictors, a larger cache or one with more ways.</p>
 <h3>Export</h3>
 <ul>
     <li><strong>Timeline</strong>, as CSV or LaTeX: one row per instruction and one column per cycle.</li>
@@ -369,6 +390,7 @@ loop:
     <tr><td>Cycles</td><td>total duration</td></tr>
     <tr><td>Completed instructions</td><td>instructions that finished (squashed ones are not counted)</td></tr>
     <tr><td>IPC and CPI</td><td>instructions per cycle and cycles per instruction</td></tr>
+    <tr><td>Period, frequency and execution time</td><td>cycle duration, its inverse and cycles times period; below the table is the path that sets the period</td></tr>
     <tr><td>Conditional branches and mispredictions</td><td>branches executed and how many were mispredicted</td></tr>
     <tr><td>Squashed instructions</td><td>fetched or issued on the wrong path</td></tr>
     <tr><td>Data hazard stalls</td><td>pipeline: cycles with an instruction stalled in ID waiting for an operand</td></tr>

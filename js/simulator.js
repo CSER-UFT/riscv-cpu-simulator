@@ -1,10 +1,12 @@
 /**
- * Ponto de entrada da simulação: escolhe o modelo de processador conforme a configuração.
+ * Ponto de entrada da simulação: escolhe o modelo de processador conforme a configuração e acrescenta
+ * o período do clock e o tempo de execução.
  */
 import { normalizeConfig } from './core/config.js';
 import { simulate as simulateTomasulo } from './models/tomasulo.js';
 import { simulatePipeline } from './models/pipeline.js';
 import { simulateSingle } from './models/single.js';
+import { addTiming } from './core/timing.js';
 
 /**
  * @param {object} program resultado de assemble()
@@ -12,7 +14,9 @@ import { simulateSingle } from './models/single.js';
  */
 export function simulate(program, config = {}) {
     const mode = normalizeConfig(config).config.mode;
-    if (mode === 'single') return simulateSingle(program, config);
-    if (mode === 'pipeline') return simulatePipeline(program, config);
-    return simulateTomasulo(program, config);
+    let sim;
+    if (mode === 'single') sim = simulateSingle(program, config);
+    else if (mode === 'pipeline') sim = simulatePipeline(program, config);
+    else sim = simulateTomasulo(program, config);
+    return sim.errors.length > 0 ? sim : addTiming(sim);
 }

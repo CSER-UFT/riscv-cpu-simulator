@@ -136,6 +136,11 @@ export function statsRows(sim) {
         ['IPC', s.ipc.toFixed(2)],
         ['CPI', s.instructions ? (s.cycles / s.instructions).toFixed(2) : '0'],
     ];
+    if (sim.timing) {
+        rows.push([t('stats.period'), `${fmtNum(sim.timing.periodPs, 0)} ps`]);
+        rows.push([t('stats.frequency'), `${fmtNum(sim.timing.freqGHz, 2)} GHz`]);
+        rows.push([t('stats.time'), `${fmtNum(sim.timing.timeNs, 2)} ns`]);
+    }
     const add = (key, v) => { if (v !== undefined) rows.push([t(key), v]); };
     if (sim.model === 'pipeline') {
         add('stats.branches', s.branches);
@@ -174,7 +179,25 @@ export function statsRows(sim) {
 export function statsPanel(ctx) {
     const rows = statsRows(ctx.sim).map(([k, v]) => `<tr><th>${k}</th><td class="num">${v}</td></tr>`).join('');
     const warn = ctx.sim.warnings.map((w) => `<p class="note warn">${esc(w)}</p>`).join('');
-    return `<section class="panel"><h3>${t('ui.stats')} <span class="sub">${t('ui.fullRun')}</span></h3><table class="stats">${rows}</table>${warn}</section>`;
+    const crit = ctx.sim.timing ? `<p class="note">${esc(criticalPathText(ctx.sim.timing))}</p>` : '';
+    return `<section class="panel"><h3>${t('ui.stats')} <span class="sub">${t('ui.fullRun')}</span></h3><table class="stats">${rows}</table>${crit}${warn}</section>`;
+}
+
+/** Número com casas decimais, sem zeros finais desnecessários. */
+export function fmtNum(v, digits) {
+    return Number(v.toFixed(digits)).toString();
+}
+
+/** Explica de onde vem o período do clock. */
+export function criticalPathText(timing) {
+    const c = timing.critical;
+    if (c.kind === 'fixed') return t('timing.fixed', { f: fmtNum(timing.freqGHz, 3) });
+    const parts = c.parts.map(([comp, mult, ps]) => (mult > 1
+        ? t('timing.partMult', { name: t(`timing.${comp}`), n: mult, ps: ps / mult })
+        : t('timing.part', { name: t(`timing.${comp}`), ps }))).join(' + ');
+    return c.kind === 'single'
+        ? t('timing.singleCritical', { cls: lowerFirst(t(`class.${c.cls}`)), parts, total: fmtNum(timing.periodPs, 0) })
+        : t('timing.stageCritical', { parts, total: fmtNum(timing.periodPs, 0) });
 }
 
 /** Posição de um elemento relativa a `root`, sem considerar a escala aplicada a ele. */
@@ -186,4 +209,8 @@ export function box(el, root) {
         e = e.offsetParent;
     }
     return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+}
+
+function lowerFirst(s) {
+    return s.charAt(0).toLowerCase() + s.slice(1);
 }
