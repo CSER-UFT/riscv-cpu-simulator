@@ -1,6 +1,10 @@
-# Simulador Superescalar RISC-V
+# Simulador de Processadores RISC-V
+
+**Acesse:** [cser-uft.github.io/riscv-processor-simulator](https://cser-uft.github.io/riscv-processor-simulator/)
 
 Simulador didático de processadores RISC-V, do monociclo ao escalonamento dinâmico pelo [algoritmo de Tomasulo](https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo), desenvolvido para o curso de **Ciência da Computação** da **Universidade Federal do Tocantins**.
+
+Começou como um simulador do algoritmo de Tomasulo (por isso o nome anterior do repositório, `riscv-simulator-tomasulo`) e hoje cobre monociclo, pipeline, Tomasulo com e sem ROB e hierarquia de memória.
 
 O simulador roda inteiramente no navegador (HTML e JavaScript, sem dependências nem etapa de compilação) e pode ser publicado diretamente no GitHub Pages. A interface está em português e em inglês, com tema claro e tema escuro (botão de contraste no cabeçalho; na primeira visita segue a preferência do sistema).
 
@@ -39,6 +43,9 @@ O editor destaca a sintaxe e marca as linhas com erro; cada erro é listado com 
 
 ## Como utilizar
 
+O botão **Ajuda** abre um manual completo, com índice e busca: primeiros passos, cada modelo explicado (o que o diagrama mostra, colunas das tabelas, hazards e penalidades), convenções de temporização, hierarquia de memória, configuração campo a campo, linguagem aceita, recursos para aula, estatísticas, glossário e simplificações do simulador. Com uma simulação aberta, ele abre direto na seção do modelo em uso.
+
+
 Clique em **Nova Simulação**, escolha um exemplo ou escreva o programa, ajuste a configuração e clique em **Executar** (ou `Ctrl` + `Enter`). Cada simulação abre em uma aba.
 
 * `Seta direita` e `Seta esquerda`, ou os botões internos: avança ou volta um passo; com `Ctrl`, um ciclo.
@@ -67,16 +74,17 @@ js/riscv/hierarchy.js    hierarquia de memória (L1I, L1D, L2, L3) para temporiz
 js/simulator.js          escolhe o modelo de processador
 js/models/single.js      monociclo
 js/models/pipeline.js    pipeline de 5 estágios
-js/tomasulo/engine.js    Tomasulo clássico e com ROB
-js/tomasulo/config.js    configuração padrão e validação
-js/tomasulo/recorder.js  passos, linha do tempo e instantâneos com compartilhamento estrutural
-js/i18n/                 textos em português e inglês
+js/models/tomasulo.js    Tomasulo clássico e com ROB
+js/core/config.js        configuração padrão e validação (todos os modelos)
+js/core/recorder.js      passos, linha do tempo e instantâneos com compartilhamento estrutural
+js/i18n/                 textos da interface em português e inglês
+js/help/                 ajuda (manual do usuário) em português e inglês
 js/ui/                   interface: diagramas, linha do tempo, editor, exercício, comparação, exportação
 js/examples.js           programas de exemplo
 test/                    testes automatizados (node --test)
 ```
 
-Para acrescentar uma instrução, basta uma entrada em `js/riscv/isa.js`; montador, simulador de referência e os três modelos usam apenas essa tabela. Para acrescentar um idioma, basta um dicionário em `js/i18n/`.
+Para acrescentar uma instrução, basta uma entrada em `js/riscv/isa.js`; montador, simulador de referência e os três modelos usam apenas essa tabela. Para acrescentar um idioma, basta um dicionário em `js/i18n/` e a ajuda correspondente em `js/help/`.
 
 ## Testes
 

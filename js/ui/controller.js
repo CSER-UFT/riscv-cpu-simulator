@@ -30,7 +30,7 @@ export class Controller extends EventTarget {
         // Recebe eventos de controle
         document.addEventListener('keydown', (e) => {
             const targetType = e.target.tagName.toLowerCase();
-            if (['textarea', 'input', 'select'].includes(targetType) || document.querySelector('.modal.visible'))
+            if (['textarea', 'input', 'select'].includes(targetType) || document.querySelector('.modal.visible') || document.body.classList.contains('help-open'))
                 return;
             if (!this.main.classList.contains('visible'))
                 return;

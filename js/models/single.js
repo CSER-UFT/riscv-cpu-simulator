@@ -9,8 +9,8 @@ import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
 import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
 import { t } from '../i18n/index.js';
-import { normalizeConfig } from '../tomasulo/config.js';
-import { Recorder } from '../tomasulo/recorder.js';
+import { normalizeConfig } from '../core/config.js';
+import { Recorder } from '../core/recorder.js';
 
 const IMM_FORMATS = new Set(['I', 'SH', 'L', 'S', 'U', 'JR']);
 

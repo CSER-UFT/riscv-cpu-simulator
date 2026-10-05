@@ -2,7 +2,7 @@
  * Resumo textual da configuração de uma simulação (usado no modo exercício e na comparação).
  */
 import { t } from '../i18n/index.js';
-import { className } from '../tomasulo/config.js';
+import { className } from '../core/config.js';
 
 export function configSummary(cfg) {
     const items = [t(`mode.${cfg.mode}`), `RV${cfg.xlen}`];

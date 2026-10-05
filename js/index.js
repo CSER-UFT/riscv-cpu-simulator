@@ -1,6 +1,6 @@
 import { assemble } from './riscv/parser.js';
 import { simulate } from './simulator.js';
-import { normalizeConfig } from './tomasulo/config.js';
+import { normalizeConfig } from './core/config.js';
 import { t, getLanguage, setLanguage, LANGUAGES } from './i18n/index.js';
 import * as diagram from './ui/diagram.js';
 import { Controller } from './ui/controller.js';
@@ -11,12 +11,15 @@ import { Viewport } from './ui/viewport.js';
 import { renderExercise } from './ui/exercise.js';
 import { renderCompare } from './ui/compare.js';
 import { timelineCsv, timelineLatex, eventsCsv, eventsLatex, download } from './ui/export.js';
+import { Help, MODEL_SECTION } from './ui/help.js';
 
 const timeline = new Timeline('timeline');
+timeline.show(false);
 const controller = new Controller('control', 'control-counter', 'control-msg', ['control-skip-back', 'control-skip-fwd'], ['control-step-back', 'control-step-fwd']);
 const tabManager = new TabManager('tab-names', 'tab-filler');
 const viewport = new Viewport('viewport', 'diagram');
 const readme = document.getElementById('readme');
+const help = new Help(readme);
 const diagramEl = document.getElementById('diagram');
 const sheet = document.getElementById('sheet');
 const buttons = {
@@ -59,7 +62,7 @@ function applyDomTranslations() {
     for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
     for (const el of document.querySelectorAll('[data-i18n-html]')) el.innerHTML = t(el.dataset.i18nHtml);
     for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
-    for (const el of readme.querySelectorAll(':scope > [lang]')) el.hidden = el.lang !== getLanguage();
+    help.render();
 }
 applyDomTranslations();
 
@@ -109,6 +112,7 @@ function uniqueName(base) {
 }
 
 function openSim(code, config, name, sim) {
+    help.close();
     const base = `${name ?? sim.program.instructions[0].text} · ${t(`mode.short.${sim.model}`)}`;
     tabManager.add(uniqueName(base), {
         kind: 'sim', sim, ctx: diagram.createContext(sim), code, config,
@@ -118,12 +122,14 @@ function openSim(code, config, name, sim) {
 }
 
 function openExercise(code, config, sim, name) {
+    help.close();
     tabManager.add(uniqueName(`${t('ui.exercise')}: ${name ?? sim.program.instructions[0].text}`), {
         kind: 'exercise', sim, code, config, state: { answers: {} },
     });
 }
 
 function openCompare(code, config, configB, simA, simB) {
+    help.close();
     tabManager.add(uniqueName(`${t('ui.compare')}: ${t(`mode.short.${simA.model}`)} × ${t(`mode.short.${simB.model}`)}`), {
         kind: 'compare', code, config, configB, simA, simB,
     });
@@ -154,7 +160,13 @@ buttons.exercise.addEventListener('click', () => {
     const c = tabManager.currentContents();
     if (c?.kind === 'sim') openExercise(c.code, c.config, c.sim, null);
 });
-document.getElementById('open-ajuda').addEventListener('click', () => readme.classList.toggle('overlay'));
+document.getElementById('open-ajuda').addEventListener('click', () => {
+    if (help.isOverlay()) return help.close();
+    const c = tabManager.currentContents();
+    if (!c) return help.show(null);
+    const model = c.sim?.model ?? c.simA?.model;
+    help.open(c.kind === 'exercise' ? 'classroom' : (c.kind === 'compare' ? 'classroom' : MODEL_SECTION[model]));
+});
 
 for (const item of buttons.export.querySelectorAll('[data-export]')) {
     item.addEventListener('click', (e) => {
@@ -210,6 +222,7 @@ function setButtons(kind) {
 
 tabManager.addEventListener('tab-unset', () => {
     timeline.clear();
+    timeline.show(false);
     controller.hide();
     viewport.hide();
     sheet.classList.add('hidden');
@@ -222,8 +235,7 @@ tabManager.addEventListener('tab-unset', () => {
 tabManager.addEventListener('tab-set', () => {
     const c = tabManager.currentContents();
     if (c === null) return;
-    readme.style.display = 'none';
-    readme.classList.remove('overlay');
+    if (!help.isOverlay()) readme.style.display = 'none';
     setButtons(c.kind);
 
     if (c.kind === 'exercise' || c.kind === 'compare') {

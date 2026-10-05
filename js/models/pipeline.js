@@ -16,8 +16,8 @@ import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveCont
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
 import { t } from '../i18n/index.js';
-import { normalizeConfig } from '../tomasulo/config.js';
-import { Recorder } from '../tomasulo/recorder.js';
+import { normalizeConfig } from '../core/config.js';
+import { Recorder } from '../core/recorder.js';
 
 export const STAGES = ['IF', 'ID', 'EX', 'MEM', 'WB'];
 

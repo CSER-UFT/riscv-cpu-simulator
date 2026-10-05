@@ -3,7 +3,7 @@
  */
 import * as fmt from '../riscv/format.js';
 import { t } from '../i18n/index.js';
-import { className } from '../tomasulo/config.js';
+import { className } from '../core/config.js';
 import { esc, tagColor, tagCell, registersPanel, memoryPanel, cachePanel, predictorPanel, statsPanel, box } from './panels.js';
 
 function progress(label, st) {

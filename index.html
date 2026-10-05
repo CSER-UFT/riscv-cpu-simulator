@@ -3,7 +3,8 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Simulador Superescalar RISC-V</title>
+        <title>Simulador de Processadores RISC-V</title>
+        <meta name="description" content="Simulador didático de processadores RISC-V: monociclo, pipeline de 5 estágios, Tomasulo com e sem ROB e hierarquia de memória." />
         <link rel="icon" href="./svg/cpu.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,7 +21,7 @@
     <body>
         <div id="workspace" class="screen">
             <header id="header">
-                <div class="brand"><span class="icon i-cpu brand-mark" aria-hidden="true"></span><span class="brand-name" data-i18n-html="ui.appTitle">Simulador Superescalar <b>RISC-V</b></span></div>
+                <div class="brand"><span class="icon i-cpu brand-mark" aria-hidden="true"></span><span class="brand-name" data-i18n-html="ui.appTitle">Simulador de Processadores <b>RISC-V</b></span></div>
                 <nav class="actions">
                     <button type="button" id="open-novo" class="btn primary"><span class="icon i-new" aria-hidden="true"></span><span data-i18n="ui.new">Nova simulação</span></button>
                     <button type="button" id="open-editar" class="btn hidden" data-i18n="ui.edit">Editar</button>
@@ -46,82 +47,7 @@
             </header>
             <div id="tab-names"><div id="tab-filler">&nbsp;</div></div>
             <div id="tab-visual">
-                <div id="readme">
-                    <div lang="pt">
-                        <h1>Simulador Superescalar RISC-V</h1>
-                        <p>Simulador didático de processadores RISC-V, do monociclo ao escalonamento dinâmico pelo <a href="https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo">algoritmo de Tomasulo</a>, desenvolvido para o curso de <strong>Ciência da Computação</strong> da <strong>Universidade Federal do Tocantins</strong>.</p>
-                        <p>Clique em <strong>Nova Simulação</strong>, escolha um exemplo ou escreva um programa em assembly RISC-V, ajuste o processador e execute. A execução pode ser acompanhada ciclo a ciclo, ou passo a passo dentro de cada ciclo, no diagrama e na linha do tempo.</p>
-                        <h2>Modelos de processador</h2>
-                        <ul>
-                            <li><strong>Monociclo</strong>: cada instrução em um ciclo, com o caminho de dados e os sinais de controle destacados a cada passo.</li>
-                            <li><strong>Pipeline de 5 estágios</strong>: IF, ID, EX, MEM e WB, com encaminhamento opcional, desvio resolvido em EX ou ID, previsão de desvios, operações de várias etapas no EX e hierarquia de memória.</li>
-                            <li><strong>Tomasulo clássico</strong>: estações de reserva, renomeação pelo nome da estação e difusão pelo CDB; sem especulação.</li>
-                            <li><strong>Tomasulo com ROB</strong>: buffer de reordenação, commit em ordem, especulação com previsão de desvios e recuperação no commit ou na execução.</li>
-                        </ul>
-                        <p>No Tomasulo são configuráveis os grupos de estações, as unidades funcionais de cada grupo (com ou sem pipeline), as latências, as larguras de emissão, de CDB e de commit, o tamanho do ROB, o encaminhamento de store para load e a hierarquia de memória.</p>
-                        <h2>Hierarquia de memória</h2>
-                        <p>Opcionalmente, o pipeline e o Tomasulo usam uma hierarquia com L1 de instruções, L1 de dados, L2 e L3 compartilhadas e memória principal. Cada nível tem tamanho, bloco, associatividade e latência configuráveis, substituição LRU e preenchimento inclusivo. A latência de um acesso é a soma das latências dos níveis consultados até o acerto. No monociclo a hierarquia só gera estatísticas.</p>
-                        <h2>Recursos para aula</h2>
-                        <ul>
-                            <li><strong>Exercício</strong>: o aluno preenche em que ciclo ocorre cada evento de cada instrução e o simulador corrige. O link copiado de um exercício abre diretamente nele.</li>
-                            <li><strong>Comparar</strong>: executa o mesmo programa com outra configuração e mostra as duas linhas do tempo e as estatísticas lado a lado.</li>
-                            <li><strong>Exportar</strong>: linha do tempo e tabela de eventos em CSV e LaTeX (inclusive em branco, para provas).</li>
-                        </ul>
-                        <h2>Linguagem aceita</h2>
-                        <ul>
-                            <li><strong>RV32I e RV64I</strong>, extensões <strong>M</strong>, <strong>F</strong> e <strong>D</strong> (inclusive <code>fmadd</code>, <code>fmsub</code>, <code>fnmadd</code> e <code>fnmsub</code>).</li>
-                            <li>Pseudoinstruções usuais: <code>li</code>, <code>la</code>, <code>mv</code>, <code>nop</code>, <code>j</code>, <code>call</code>, <code>ret</code>, <code>beqz</code>, <code>bgt</code>, <code>fmv.s</code>, entre outras.</li>
-                            <li>Registradores numéricos (<code>x10</code>, <code>f2</code>) ou da ABI (<code>a0</code>, <code>ft2</code>); <code>x0</code> vale sempre zero.</li>
-                            <li>Rótulos, seções <code>.text</code> e <code>.data</code> e as diretivas <code>.word</code>, <code>.half</code>, <code>.byte</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code>, <code>.align</code>, <code>.string</code> e <code>.equ</code>. Os dados começam em <code>0x10000</code> e <code>sp</code> em <code>0x7fff0</code>.</li>
-                            <li>Valores iniciais de registradores em comentários: <code># a0 = 10</code> ou <code># f1 = 2.5</code>.</li>
-                            <li><code>ecall</code> e <code>ebreak</code> encerram o programa.</li>
-                        </ul>
-                        <h2>Controles</h2>
-                        <ul>
-                            <li><code>Seta direita</code> e <code>Seta esquerda</code>, ou os botões internos: avança ou volta um passo; com <code>Ctrl</code>, um ciclo.</li>
-                            <li><code>Home</code> e <code>End</code>, ou os botões das extremidades: início e fim da execução.</li>
-                            <li>Arraste o diagrama para mudar a posição e use a roda do mouse para ampliar; duplo clique restaura a posição.</li>
-                        </ul>
-                        <p>Código fonte: <a href="https://github.com/CSER-UFT/riscv-simulator-tomasulo">github.com/CSER-UFT/riscv-simulator-tomasulo</a>.</p>
-                    </div>
-                    <div lang="en">
-                        <h1>RISC-V Superscalar Simulator</h1>
-                        <p>An educational simulator of RISC-V processors, from single cycle to dynamic scheduling with <a href="https://en.wikipedia.org/wiki/Tomasulo%27s_algorithm">Tomasulo's algorithm</a>, developed for the <strong>Computer Science</strong> program at the <strong>Federal University of Tocantins</strong> (Brazil).</p>
-                        <p>Click <strong>New Simulation</strong>, pick an example or write a RISC-V assembly program, configure the processor and run it. Execution can be followed cycle by cycle, or step by step within each cycle, in the diagram and in the timeline.</p>
-                        <h2>Processor models</h2>
-                        <ul>
-                            <li><strong>Single cycle</strong>: one instruction per cycle, with the datapath and control signals highlighted at each step.</li>
-                            <li><strong>5-stage pipeline</strong>: IF, ID, EX, MEM and WB, with optional forwarding, branches resolved in EX or ID, branch prediction, multicycle EX operations and a memory hierarchy.</li>
-                            <li><strong>Classic Tomasulo</strong>: reservation stations, renaming by station name and CDB broadcast; no speculation.</li>
-                            <li><strong>Tomasulo with ROB</strong>: reorder buffer, in-order commit, speculation with branch prediction and recovery at commit or at execution.</li>
-                        </ul>
-                        <p>For Tomasulo you can configure station groups, functional units per group (pipelined or not), latencies, issue, CDB and commit widths, ROB size, store-to-load forwarding and the memory hierarchy.</p>
-                        <h2>Memory hierarchy</h2>
-                        <p>Optionally, the pipeline and Tomasulo use a hierarchy with an instruction L1, a data L1, shared L2 and L3 and main memory. Each level has configurable size, block, associativity and latency, LRU replacement and inclusive fill. The latency of an access is the sum of the latencies of the levels checked until a hit. In the single-cycle model the hierarchy only collects statistics.</p>
-                        <h2>Classroom features</h2>
-                        <ul>
-                            <li><strong>Exercise</strong>: students fill in the cycle of each event of each instruction and the simulator grades it. A copied exercise link opens directly in exercise mode.</li>
-                            <li><strong>Compare</strong>: runs the same program with another configuration and shows both timelines and statistics side by side.</li>
-                            <li><strong>Export</strong>: timeline and event table as CSV and LaTeX (also blank, for exams).</li>
-                        </ul>
-                        <h2>Supported language</h2>
-                        <ul>
-                            <li><strong>RV32I and RV64I</strong>, <strong>M</strong>, <strong>F</strong> and <strong>D</strong> extensions (including <code>fmadd</code>, <code>fmsub</code>, <code>fnmadd</code> and <code>fnmsub</code>).</li>
-                            <li>Common pseudo instructions: <code>li</code>, <code>la</code>, <code>mv</code>, <code>nop</code>, <code>j</code>, <code>call</code>, <code>ret</code>, <code>beqz</code>, <code>bgt</code>, <code>fmv.s</code>, and more.</li>
-                            <li>Numeric (<code>x10</code>, <code>f2</code>) or ABI (<code>a0</code>, <code>ft2</code>) register names; <code>x0</code> is always zero.</li>
-                            <li>Labels, <code>.text</code> and <code>.data</code> sections and the <code>.word</code>, <code>.half</code>, <code>.byte</code>, <code>.dword</code>, <code>.float</code>, <code>.double</code>, <code>.space</code>, <code>.align</code>, <code>.string</code> and <code>.equ</code> directives. Data starts at <code>0x10000</code> and <code>sp</code> at <code>0x7fff0</code>.</li>
-                            <li>Initial register values in comments: <code># a0 = 10</code> or <code># f1 = 2.5</code>.</li>
-                            <li><code>ecall</code> and <code>ebreak</code> end the program.</li>
-                        </ul>
-                        <h2>Controls</h2>
-                        <ul>
-                            <li><code>Right arrow</code> and <code>Left arrow</code>, or the inner buttons: one step forward or back; with <code>Ctrl</code>, one cycle.</li>
-                            <li><code>Home</code> and <code>End</code>, or the outer buttons: start and end of the execution.</li>
-                            <li>Drag the diagram to move it and use the mouse wheel to zoom; double click resets the view.</li>
-                        </ul>
-                        <p>Source code: <a href="https://github.com/CSER-UFT/riscv-simulator-tomasulo">github.com/CSER-UFT/riscv-simulator-tomasulo</a>.</p>
-                    </div>
-                </div>
+                <div id="readme" class="readme"></div>
                 <div id="viewport">
                     <div id="diagram"></div>
                 </div>

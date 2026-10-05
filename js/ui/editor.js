@@ -4,7 +4,7 @@
  */
 import { EXAMPLES, exampleName } from '../examples.js';
 import { t } from '../i18n/index.js';
-import { DEFAULT_CONFIG, MODE_IDS, PREDICTOR_IDS, LATENCY_IDS, STATION_CLASSES, className, normalizeConfig } from '../tomasulo/config.js';
+import { DEFAULT_CONFIG, MODE_IDS, PREDICTOR_IDS, LATENCY_IDS, STATION_CLASSES, className, normalizeConfig } from '../core/config.js';
 import { highlight } from './highlight.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c]);

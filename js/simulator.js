@@ -1,8 +1,8 @@
 /**
  * Ponto de entrada da simulação: escolhe o modelo de processador conforme a configuração.
  */
-import { normalizeConfig } from './tomasulo/config.js';
-import { simulate as simulateTomasulo } from './tomasulo/engine.js';
+import { normalizeConfig } from './core/config.js';
+import { simulate as simulateTomasulo } from './models/tomasulo.js';
 import { simulatePipeline } from './models/pipeline.js';
 import { simulateSingle } from './models/single.js';
 

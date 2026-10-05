@@ -1,7 +1,9 @@
 {
-  "name": "riscv-simulator-tomasulo",
+  "name": "riscv-processor-simulator",
   "private": true,
-  "description": "Simulador didático do algoritmo de Tomasulo para RISC-V",
+  "description": "Simulador didático de processadores RISC-V: monociclo, pipeline, Tomasulo e hierarquia de memória",
+  "repository": "github:CSER-UFT/riscv-processor-simulator",
+  "license": "GPL-3.0",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",

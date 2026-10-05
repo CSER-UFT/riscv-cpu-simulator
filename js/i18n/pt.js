@@ -206,8 +206,8 @@ export default {
     'asm.what.base': 'registrador base',
 
     // Interface ---------------------------------------------------------------------------------------------
-    'ui.docTitle': 'Simulador Superescalar RISC-V',
-    'ui.appTitle': 'Simulador Superescalar <b>RISC-V</b>',
+    'ui.docTitle': 'Simulador de Processadores RISC-V',
+    'ui.appTitle': 'Simulador de Processadores <b>RISC-V</b>',
     'ui.new': 'Nova simulação',
     'ui.edit': 'Editar',
     'ui.compare': 'Comparar',
@@ -383,8 +383,8 @@ export default {
     'ev.cycle': 'Ciclo',
     'ev.execStart': 'Início exec.',
     'ev.execEnd': 'Fim exec.',
-    'export.timelineTitle': 'Linha do tempo gerada pelo Simulador Superescalar RISC-V',
-    'export.eventsTitle': 'Tabela de eventos gerada pelo Simulador Superescalar RISC-V',
+    'export.timelineTitle': 'Linha do tempo gerada pelo Simulador de Processadores RISC-V',
+    'export.eventsTitle': 'Tabela de eventos gerada pelo Simulador de Processadores RISC-V',
     'export.requires': 'Requer \\usepackage[table]{xcolor} e, para a linha do tempo, \\usepackage{graphicx}.',
     'export.timelineCaption': 'Linha do tempo de execução ({model}).',
     'export.eventsCaption': 'Ciclo de cada evento por instrução ({model}).',

@@ -26,8 +26,8 @@ import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveCont
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
 import { t } from '../i18n/index.js';
-import { normalizeConfig, checkProgram, className } from './config.js';
-import { Recorder } from './recorder.js';
+import { normalizeConfig, checkProgram, className } from '../core/config.js';
+import { Recorder } from '../core/recorder.js';
 
 const MEM_CLASSES = new Set(['load', 'store']);
 const ADDRESS_KNOWN = new Set(['addrDone', 'mem', 'memw', 'done']);
