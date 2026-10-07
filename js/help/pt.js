@@ -225,7 +225,7 @@ export default {
 </table>
 <h3>Política</h3>
 <ul>
-    <li><strong>Endereço</strong>: bloco = endereço ÷ tamanho do bloco; conjunto = bloco módulo número de conjuntos; tag = bloco ÷ número de conjuntos.</li>
+    <li><strong>Endereço</strong> (físico, quando a memória virtual está ligada): bloco = endereço ÷ tamanho do bloco; conjunto = bloco módulo número de conjuntos; tag = bloco ÷ número de conjuntos.</li>
     <li><strong>Substituição</strong>: LRU (o bloco usado há mais tempo sai).</li>
     <li><strong>Preenchimento inclusivo</strong>: o bloco é trazido para todos os níveis por onde o acesso passou. Um bloco expulso da L1D pode continuar na L2.</li>
     <li><strong>Escrita</strong>: com alocação (um store que falha traz o bloco). O custo de escrever blocos modificados de volta não é modelado.</li>
@@ -240,6 +240,34 @@ export default {
 <h3>O painel</h3>
 <p>Mostra o último acesso (instrução ou dado, endereço, nível que atendeu e latência), cada nível com a taxa de acerto e o conteúdo dos conjuntos (a tag de cada via; ponto para via vazia) e a memória principal com o número de acessos. O nível que acertou no último acesso fica verde e os que falharam ficam vermelhos. Em caches com muitos conjuntos, só os ocupados são listados.</p>
 <p>Nas estatísticas aparecem a taxa de acerto de cada nível e o tempo médio de acesso a dados e de busca de instruções (AMAT), em ciclos.</p>`,
+        },
+        {
+            id: 'vm',
+            title: 'Memória virtual',
+            html: `
+<p>Com a hierarquia de memória ligada, a opção <em>Simular a memória virtual</em> faz cada acesso (busca de instrução pela L1I, load e store) começar pela tradução do endereço virtual em físico. Como as caches, a memória virtual só muda o tempo: os valores continuam os mesmos de uma execução sem ela.</p>
+<h3>Esquema de paginação</h3>
+<p>O esquema segue o XLEN: <strong>Sv32</strong> no RV32 (endereço virtual de 32 bits, tabela de 2 níveis, PTE de 4 bytes) e <strong>Sv39</strong> no RV64 (39 bits, 3 níveis, PTE de 8 bytes). Com páginas de 4 KiB, o endereço virtual se divide assim:</p>
+<table>
+    <tr><th>Esquema</th><th>VPN</th><th>Deslocamento</th></tr>
+    <tr><td>Sv32</td><td>VPN[1] (10 bits), VPN[0] (10 bits)</td><td>12 bits</td></tr>
+    <tr><td>Sv39</td><td>VPN[2], VPN[1], VPN[0] (9 bits cada)</td><td>12 bits</td></tr>
+</table>
+<p>Páginas menores (de 64 bytes em diante, sempre potências de 2) não existem no RISC-V, mas servem para que programas pequenos ocupem várias páginas e mostrem falhas na TLB e faltas de página. Nesse caso os bits da VPN são repartidos entre os níveis do mesmo jeito (o nível mais alto fica com a sobra).</p>
+<h3>Tradução</h3>
+<ol>
+    <li><strong>TLB</strong>: a VPN é procurada na TLB (associativa por conjunto, substituição LRU). No acerto, a tradução custa só a latência da TLB, que por padrão é 0, como se a TLB fosse consultada em paralelo com a L1.</li>
+    <li><strong>Caminhada na tabela</strong>: na falha, o hardware lê uma PTE por nível, começando pela tabela raiz (o endereço guardado em <code>satp</code>). Cada PTE é lida pela hierarquia de dados (L1D, L2, L3, memória), então as PTEs disputam espaço na cache com os dados e a caminhada custa a soma dessas leituras.</li>
+    <li><strong>Falta de página</strong>: se uma PTE é inválida (a tabela do nível seguinte não existe ou a página não está na memória), o sistema operacional coloca a página em um quadro livre ou, sem quadro livre, expulsa a página usada há mais tempo (a PTE dela fica inválida e a entrada dela na TLB é apagada). Isso custa a <em>latência da falta de página</em>. Depois, a instrução é reexecutada: a caminhada é refeita e a TLB é preenchida.</li>
+    <li><strong>Endereço físico</strong>: quadro × tamanho da página + deslocamento. É com ele que as caches são consultadas (caches com índice e tag físicos).</li>
+</ol>
+<p>Exemplo com Sv32, páginas de 4 KiB, um load em <code>0x10010</code> e a TLB vazia: VPN = <code>0x10</code> (VPN[1] = 0, VPN[0] = 16), deslocamento <code>0x010</code>. Sem pré-carga, a PTE raiz é inválida e há falta de página; a página vai para o quadro 0, a caminhada refeita lê as duas PTEs e o endereço físico é <code>0x010</code>.</p>
+<p>A latência da falta de página é pequena por padrão (100 ciclos) para caber no limite de ciclos da simulação. Numa máquina real, buscar a página no disco custa milhões de ciclos, e o processador executa outro processo enquanto isso.</p>
+<h3>Quadros e pré-carga</h3>
+<p>O número de <em>quadros físicos</em> limita quantas páginas do programa ficam na memória ao mesmo tempo. Com a pré-carga ligada, as páginas do código, dos dados (inclusive <code>.space</code>) e do topo da pilha são mapeadas antes do início, até acabarem os quadros, e só as demais causam faltas. As tabelas de páginas ficam numa região física própria, logo depois dos quadros, e nunca são expulsas.</p>
+<h3>O painel</h3>
+<p>O painel <em>Memória virtual</em> aparece acima da hierarquia de memória e mostra a última tradução: o endereço virtual dividido em VPN e deslocamento, acerto ou falha na TLB, as PTEs lidas em cada caminhada (endereço físico, nível da cache que atendeu e se eram válidas), a falta de página, se houve, e o cálculo do endereço físico. Abaixo vêm a TLB (VPN e quadro de cada via) e a tabela de páginas (quadro, se a página está na memória ou no disco, e o último uso). O exemplo <em>Memória virtual</em> percorre uma matriz por linhas e por colunas com uma TLB de 2 entradas.</p>
+<p>Nas estatísticas aparecem a taxa de acerto da TLB, as caminhadas, as faltas de página, as páginas expulsas e o custo médio da tradução. O tempo médio de acesso (AMAT) passa a incluir a tradução.</p>`,
         },
         {
             id: 'performance',
@@ -296,7 +324,7 @@ export default {
 <h3>Latências</h3>
 <p>Ciclos de execução de cada classe. No monociclo, as latências não mudam o número de ciclos, mas definem o período do clock. <em>Cálculo de endereço</em>, <em>Acesso à memória</em> e <em>Escrita na memória</em> valem só para o Tomasulo; os dois últimos são substituídos pela hierarquia de memória quando ela está ligada. No pipeline, a latência é o tempo que a instrução passa no EX.</p>
 <h3>Hierarquia de memória</h3>
-<p>Ver <a href="#h-memory">Hierarquia de memória</a>.</p>
+<p>Ver <a href="#h-memory">Hierarquia de memória</a> e <a href="#h-vm">Memória virtual</a>.</p>
 <h3>Tempo de ciclo</h3>
 <p>Período do clock calculado pelos atrasos dos componentes (memória de instruções, leitura de registradores, ALU, memória de dados, escrita de registradores, registrador de pipeline e sobrecarga do escalonamento do Tomasulo) ou dado por uma frequência em GHz. Ver <a href="#h-performance">Desempenho e tempo de execução</a>.</p>
 <h3>Simulação</h3>
@@ -400,6 +428,7 @@ laco:
     <tr><td>Esperas pelo CDB e por unidade funcional</td><td>Tomasulo: vezes em que um resultado ou uma operação esperou um recurso</td></tr>
     <tr><td>Loads com valor encaminhado</td><td>Tomasulo: loads atendidos por encaminhamento de store</td></tr>
     <tr><td>Taxa de acerto por nível e tempo médio de acesso</td><td>hierarquia de memória</td></tr>
+    <tr><td>Taxa de acerto da TLB, caminhadas, faltas de página, páginas expulsas e custo médio da tradução</td><td>memória virtual</td></tr>
 </table>`,
         },
         {
@@ -420,6 +449,9 @@ laco:
     <dt>Associatividade</dt><dd>Número de vias de um conjunto da cache, isto é, quantos blocos com o mesmo índice podem estar na cache ao mesmo tempo.</dd>
     <dt>LRU</dt><dd>Least Recently Used: política que substitui o bloco usado há mais tempo.</dd>
     <dt>AMAT</dt><dd>Tempo médio de acesso à memória, em ciclos.</dd>
+    <dt>TLB</dt><dd>Translation Lookaside Buffer: cache das traduções recentes de VPN para quadro físico.</dd>
+    <dt>VPN e PTE</dt><dd>Número da página virtual (o endereço virtual sem o deslocamento) e entrada da tabela de páginas, que aponta para a tabela do nível seguinte ou para o quadro da página.</dd>
+    <dt>Falta de página</dt><dd>Acesso a uma página que não está na memória física; o sistema operacional a traz do disco.</dd>
     <dt>IPC e CPI</dt><dd>Instruções por ciclo e ciclos por instrução.</dd>
 </dl>`,
         },
@@ -430,7 +462,8 @@ laco:
 <p>O simulador é didático e deixa de fora alguns detalhes de processadores reais:</p>
 <ul>
     <li>Não há entrada e saída: <code>ecall</code> apenas encerra o programa.</li>
-    <li>Não há memória virtual, TLB, exceções nem instruções de CSR; os sinalizadores de exceção do ponto flutuante não são registrados.</li>
+    <li>Não há exceções visíveis ao programa nem instruções de CSR; os sinalizadores de exceção do ponto flutuante não são registrados.</li>
+    <li>A memória virtual só afeta o tempo: não há proteção (bits de permissão), bits de acesso e de modificação nas PTEs, páginas grandes, ASIDs nem custo de escrever no disco uma página modificada expulsa. A substituição de páginas é LRU exata. No Tomasulo com ROB, uma busca especulativa no caminho errado pode causar falta de página, que um processador real só trataria se a instrução chegasse ao commit.</li>
     <li>O modo de arredondamento só é aplicado nas conversões de ponto flutuante para inteiro; as demais operações arredondam para o par mais próximo.</li>
     <li>Valores de precisão simples guardados em registradores <code>f</code> não usam o encaixotamento com NaN da especificação.</li>
     <li>A hierarquia de memória não modela o custo de escrever blocos modificados de volta nem a disputa entre busca e dados pela L2.</li>
@@ -444,7 +477,7 @@ laco:
             title: 'Sobre',
             html: `
 <p>Desenvolvido no curso de Ciência da Computação da Universidade Federal do Tocantins (UFT), Câmpus de Palmas, no grupo CSER. Software livre sob a licença GNU GPL versão 3.</p>
-<p>Código fonte, documentação para desenvolvedores e testes: <a href="https://github.com/CSER-UFT/riscv-simulator">github.com/CSER-UFT/riscv-simulator</a>.</p>
+<p>Código fonte, documentação para desenvolvedores e testes: <a href="https://github.com/CSER-UFT/riscv-cpu-simulator">github.com/CSER-UFT/riscv-cpu-simulator</a>.</p>
 <p>Referências: D. A. Patterson e J. L. Hennessy, <em>Organização e Projeto de Computadores: a interface hardware/software, edição RISC-V</em>; J. L. Hennessy e D. A. Patterson, <em>Arquitetura de Computadores: uma abordagem quantitativa</em>; R. M. Tomasulo, <em>An Efficient Algorithm for Exploiting Multiple Arithmetic Units</em>, IBM Journal, 1967; <em>The RISC-V Instruction Set Manual</em>.</p>`,
         },
     ],

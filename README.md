@@ -1,10 +1,10 @@
 # Simulador de Processadores RISC-V
 
-**Acesse:** [cser-uft.github.io/riscv-simulator](https://cser-uft.github.io/riscv-simulator/)
+**Acesse:** [cser-uft.github.io/riscv-cpu-simulator](https://cser-uft.github.io/riscv-cpu-simulator/)
 
 Simulador didático de processadores RISC-V, do monociclo ao escalonamento dinâmico pelo [algoritmo de Tomasulo](https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo), desenvolvido para o curso de **Ciência da Computação** da **Universidade Federal do Tocantins**.
 
-Começou como um simulador do algoritmo de Tomasulo (por isso o nome anterior do repositório, `riscv-simulator-tomasulo`) e hoje cobre monociclo, pipeline, Tomasulo com e sem ROB e hierarquia de memória.
+Começou como um simulador do algoritmo de Tomasulo (por isso os nomes anteriores do repositório, `riscv-simulator-tomasulo` e `riscv-simulator`) e hoje cobre monociclo, pipeline, Tomasulo com e sem ROB, hierarquia de memória e memória virtual.
 
 O simulador roda inteiramente no navegador (HTML e JavaScript, sem dependências nem etapa de compilação) e pode ser publicado diretamente no GitHub Pages. A interface está em português e em inglês, com tema claro e tema escuro (botão de contraste no cabeçalho; na primeira visita segue a preferência do sistema).
 
@@ -20,6 +20,10 @@ No Tomasulo são configuráveis os grupos de estações (nome, quantidade e clas
 ## Hierarquia de memória
 
 O pipeline e o Tomasulo podem usar uma hierarquia com L1 de instruções (L1I), L1 de dados (L1D), L2 e L3 compartilhadas e memória principal. Cada nível pode ser ligado ou desligado e tem tamanho, bloco, associatividade e latência de acesso configuráveis, com substituição LRU, alocação na escrita e preenchimento inclusivo (o bloco é colocado em todos os níveis por onde o acesso passou). A latência de um acesso é a soma das latências dos níveis consultados até o acerto, mais a da memória principal se todos falharem; sem L1I, a busca de instruções é ideal. O painel mostra o conteúdo de cada nível, o último acesso e as taxas de acerto, e as estatísticas incluem o tempo médio de acesso. No monociclo, que tem CPI 1 por definição, a hierarquia só gera estatísticas. Configurações antigas com uma única cache de dados continuam aceitas.
+
+## Memória virtual
+
+Com a hierarquia ligada, a memória virtual pode ser simulada: Sv32 no RV32 (tabela de 2 níveis) e Sv39 no RV64 (3 níveis). Cada acesso começa pela TLB (entradas, associatividade e latência configuráveis, substituição LRU); numa falha, o hardware lê uma PTE por nível pela hierarquia de dados, de modo que as PTEs também ocupam a cache. Uma PTE inválida causa falta de página: a página vai para um quadro livre ou expulsa a usada há mais tempo (invalidando a PTE e a entrada da TLB dela), com latência configurável, e a caminhada é refeita. As caches passam a ser consultadas com o endereço físico. O tamanho da página é configurável a partir de 64 bytes, para que programas pequenos ocupem várias páginas, e as páginas do código, dos dados e da pilha podem ser carregadas antes do início. O painel mostra a última tradução decomposta (VPN, deslocamento, PTEs lidas, endereço físico), a TLB e a tabela de páginas; as estatísticas incluem a taxa de acerto da TLB, as caminhadas, as faltas de página e o custo médio da tradução. Como as caches, a memória virtual só afeta o tempo.
 
 ## Tempo de execução
 
@@ -75,6 +79,7 @@ js/riscv/parser.js       montador: rótulos, pseudoinstruções, diretivas, erro
 js/riscv/machine.js      estado inicial e simulador funcional de referência (sequencial)
 js/riscv/memory.js       memória esparsa endereçável por byte
 js/riscv/hierarchy.js    hierarquia de memória (L1I, L1D, L2, L3) para temporização
+js/riscv/vm.js           memória virtual: TLB, tabela de páginas Sv32 e Sv39, faltas de página
 js/simulator.js          escolhe o modelo de processador
 js/models/single.js      monociclo
 js/models/pipeline.js    pipeline de 5 estágios
@@ -99,7 +104,7 @@ Requer Node.js 20 ou mais recente, sem dependências.
 npm test
 ```
 
-A suíte verifica o montador, a semântica das instruções, os dicionários de tradução e o comportamento temporal de cada modelo (dependências RAW, WAR e WAW, encaminhamento, bolhas, penalidades de desvio, conflitos estruturais, de CDB e de unidade funcional, especulação, commit em ordem, encaminhamento de store para load e hierarquia de memória). O teste principal compara o estado final de cada modelo com o do simulador funcional de referência para programas escritos à mão e para programas gerados aleatoriamente, em dezessete configurações de hardware diferentes. A quantidade de programas aleatórios pode ser alterada com a variável `RANDOM_PROGRAMS`.
+A suíte verifica o montador, a semântica das instruções, os dicionários de tradução e o comportamento temporal de cada modelo (dependências RAW, WAR e WAW, encaminhamento, bolhas, penalidades de desvio, conflitos estruturais, de CDB e de unidade funcional, especulação, commit em ordem, encaminhamento de store para load, hierarquia de memória e memória virtual). O teste principal compara o estado final de cada modelo com o do simulador funcional de referência para programas escritos à mão e para programas gerados aleatoriamente, em dezenove configurações de hardware diferentes. A quantidade de programas aleatórios pode ser alterada com a variável `RANDOM_PROGRAMS`.
 
 ## Execução local
 

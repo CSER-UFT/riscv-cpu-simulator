@@ -1,8 +1,8 @@
 {
-  "name": "riscv-simulator",
+  "name": "riscv-cpu-simulator",
   "private": true,
   "description": "Simulador didático de processadores RISC-V: monociclo, pipeline, Tomasulo e hierarquia de memória",
-  "repository": "github:CSER-UFT/riscv-simulator",
+  "repository": "github:CSER-UFT/riscv-cpu-simulator",
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {

@@ -225,7 +225,7 @@ export default {
 </table>
 <h3>Policy</h3>
 <ul>
-    <li><strong>Address</strong>: block = address ÷ block size; set = block modulo number of sets; tag = block ÷ number of sets.</li>
+    <li><strong>Address</strong> (physical, when virtual memory is on): block = address ÷ block size; set = block modulo number of sets; tag = block ÷ number of sets.</li>
     <li><strong>Replacement</strong>: LRU (the least recently used block leaves).</li>
     <li><strong>Inclusive fill</strong>: the block is brought into every level the access went through. A block evicted from L1D may still be in L2.</li>
     <li><strong>Writes</strong>: write allocate (a missing store brings the block in). The cost of writing modified blocks back is not modeled.</li>
@@ -240,6 +240,34 @@ export default {
 <h3>The panel</h3>
 <p>Shows the last access (instruction or data, address, level that served it and latency), each level with its hit rate and set contents (the tag of each way; a dot for an empty way) and main memory with its number of accesses. The level that hit on the last access turns green and those that missed turn red. For caches with many sets, only occupied sets are listed.</p>
 <p>The statistics include the hit rate of each level and the average data access and instruction fetch times (AMAT), in cycles.</p>`,
+        },
+        {
+            id: 'vm',
+            title: 'Virtual memory',
+            html: `
+<p>With the memory hierarchy enabled, the <em>Simulate virtual memory</em> option makes every access (instruction fetch through the L1I, loads and stores) start by translating the virtual address into a physical one. Like the caches, virtual memory only changes timing: the values are the same as in a run without it.</p>
+<h3>Paging scheme</h3>
+<p>The scheme follows XLEN: <strong>Sv32</strong> on RV32 (32 bit virtual address, 2 level table, 4 byte PTE) and <strong>Sv39</strong> on RV64 (39 bits, 3 levels, 8 byte PTE). With 4 KiB pages, the virtual address is split as follows:</p>
+<table>
+    <tr><th>Scheme</th><th>VPN</th><th>Offset</th></tr>
+    <tr><td>Sv32</td><td>VPN[1] (10 bits), VPN[0] (10 bits)</td><td>12 bits</td></tr>
+    <tr><td>Sv39</td><td>VPN[2], VPN[1], VPN[0] (9 bits each)</td><td>12 bits</td></tr>
+</table>
+<p>Smaller pages (64 bytes and up, always powers of 2) do not exist in RISC-V, but they make small programs span several pages and show TLB misses and page faults. In that case the VPN bits are split among the levels in the same way (the top level takes the remainder).</p>
+<h3>Translation</h3>
+<ol>
+    <li><strong>TLB</strong>: the VPN is looked up in the TLB (set associative, LRU replacement). On a hit, translation costs only the TLB latency, which is 0 by default, as if the TLB were looked up in parallel with the L1.</li>
+    <li><strong>Page table walk</strong>: on a miss, the hardware reads one PTE per level, starting at the root table (the address held in <code>satp</code>). Each PTE is read through the data hierarchy (L1D, L2, L3, memory), so PTEs compete with data for cache space and the walk costs the sum of those reads.</li>
+    <li><strong>Page fault</strong>: if a PTE is invalid (the next level table does not exist or the page is not in memory), the operating system places the page in a free frame or, with no free frame, evicts the least recently used page (its PTE becomes invalid and its TLB entry is cleared). This costs the <em>page fault latency</em>. Then the instruction is restarted: the walk is redone and the TLB is filled.</li>
+    <li><strong>Physical address</strong>: frame × page size + offset. The caches are looked up with it (physically indexed, physically tagged caches).</li>
+</ol>
+<p>Example with Sv32, 4 KiB pages, a load at <code>0x10010</code> and an empty TLB: VPN = <code>0x10</code> (VPN[1] = 0, VPN[0] = 16), offset <code>0x010</code>. Without preloading, the root PTE is invalid and there is a page fault; the page goes to frame 0, the redone walk reads both PTEs and the physical address is <code>0x010</code>.</p>
+<p>The page fault latency is small by default (100 cycles) to fit the simulation cycle limit. On a real machine, fetching the page from disk costs millions of cycles, and the processor runs another process meanwhile.</p>
+<h3>Frames and preloading</h3>
+<p>The number of <em>physical frames</em> limits how many program pages are in memory at the same time. With preloading on, the code, data (including <code>.space</code>) and stack top pages are mapped before the start, until the frames run out, and only the others cause faults. Page tables live in their own physical region, right after the frames, and are never evicted.</p>
+<h3>The panel</h3>
+<p>The <em>Virtual memory</em> panel appears above the memory hierarchy and shows the last translation: the virtual address split into VPN and offset, TLB hit or miss, the PTEs read in each walk (physical address, cache level that served it and whether it was valid), the page fault, if any, and the physical address computation. Below come the TLB (VPN and frame of each way) and the page table (frame, whether the page is in memory or on disk, and last use). The <em>Virtual memory</em> example walks a matrix by rows and by columns with a 2 entry TLB.</p>
+<p>The statistics show the TLB hit rate, the walks, the page faults, the evicted pages and the average translation cost. The average memory access time (AMAT) now includes translation.</p>`,
         },
         {
             id: 'performance',
@@ -296,7 +324,7 @@ export default {
 <h3>Latencies</h3>
 <p>Execution cycles of each class. In the single cycle model, latencies do not change the cycle count, but they set the clock period. <em>Address calculation</em>, <em>Memory access</em> and <em>Memory write</em> only apply to Tomasulo; the last two are replaced by the memory hierarchy when it is enabled. On the pipeline, the latency is the time the instruction spends in EX.</p>
 <h3>Memory hierarchy</h3>
-<p>See <a href="#h-memory">Memory hierarchy</a>.</p>
+<p>See <a href="#h-memory">Memory hierarchy</a> and <a href="#h-vm">Virtual memory</a>.</p>
 <h3>Cycle time</h3>
 <p>Clock period computed from component delays (instruction memory, register read, ALU, data memory, register write, pipeline register and Tomasulo scheduling overhead) or given as a frequency in GHz. See <a href="#h-performance">Performance and execution time</a>.</p>
 <h3>Simulation</h3>
@@ -400,6 +428,7 @@ loop:
     <tr><td>CDB and functional unit waits</td><td>Tomasulo: times a result or an operation waited for a resource</td></tr>
     <tr><td>Loads with forwarded value</td><td>Tomasulo: loads served by store forwarding</td></tr>
     <tr><td>Hit rate per level and average access time</td><td>memory hierarchy</td></tr>
+    <tr><td>TLB hit rate, walks, page faults, evicted pages and average translation cost</td><td>virtual memory</td></tr>
 </table>`,
         },
         {
@@ -420,6 +449,9 @@ loop:
     <dt>Associativity</dt><dd>The number of ways in a cache set, that is, how many blocks with the same index can be in the cache at the same time.</dd>
     <dt>LRU</dt><dd>Least Recently Used: the policy that replaces the block used longest ago.</dd>
     <dt>AMAT</dt><dd>Average memory access time, in cycles.</dd>
+    <dt>TLB</dt><dd>Translation Lookaside Buffer: cache of recent translations from VPN to physical frame.</dd>
+    <dt>VPN and PTE</dt><dd>Virtual page number (the virtual address without the offset) and page table entry, which points to the next level table or to the page frame.</dd>
+    <dt>Page fault</dt><dd>Access to a page that is not in physical memory; the operating system brings it from disk.</dd>
     <dt>IPC and CPI</dt><dd>Instructions per cycle and cycles per instruction.</dd>
 </dl>`,
         },
@@ -430,7 +462,8 @@ loop:
 <p>The simulator is educational and leaves out some details of real processors:</p>
 <ul>
     <li>There is no input or output: <code>ecall</code> just ends the program.</li>
-    <li>There is no virtual memory, TLB, exceptions or CSR instructions; floating point exception flags are not recorded.</li>
+    <li>There are no exceptions visible to the program and no CSR instructions; floating point exception flags are not recorded.</li>
+    <li>Virtual memory only affects timing: there is no protection (permission bits), no accessed and dirty bits in the PTEs, no superpages, no ASIDs and no cost for writing an evicted modified page to disk. Page replacement is exact LRU. In Tomasulo with ROB, a speculative fetch on the wrong path may cause a page fault, which a real processor would only handle if the instruction reached commit.</li>
     <li>The rounding mode only applies to floating point to integer conversions; other operations round to nearest even.</li>
     <li>Single precision values held in <code>f</code> registers do not use the NaN boxing of the specification.</li>
     <li>The memory hierarchy does not model the cost of writing modified blocks back, nor the contention between fetch and data for L2.</li>
@@ -444,7 +477,7 @@ loop:
             title: 'About',
             html: `
 <p>Developed in the Computer Science program of the Federal University of Tocantins (UFT), Palmas campus, by the CSER group. Free software under the GNU GPL version 3.</p>
-<p>Source code, developer documentation and tests: <a href="https://github.com/CSER-UFT/riscv-simulator">github.com/CSER-UFT/riscv-simulator</a>.</p>
+<p>Source code, developer documentation and tests: <a href="https://github.com/CSER-UFT/riscv-cpu-simulator">github.com/CSER-UFT/riscv-cpu-simulator</a>.</p>
 <p>References: D. A. Patterson and J. L. Hennessy, <em>Computer Organization and Design: The Hardware/Software Interface, RISC-V Edition</em>; J. L. Hennessy and D. A. Patterson, <em>Computer Architecture: A Quantitative Approach</em>; R. M. Tomasulo, <em>An Efficient Algorithm for Exploiting Multiple Arithmetic Units</em>, IBM Journal, 1967; <em>The RISC-V Instruction Set Manual</em>.</p>`,
         },
     ],
