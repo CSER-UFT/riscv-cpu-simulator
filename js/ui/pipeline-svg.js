@@ -9,6 +9,7 @@
  * encaminhamento no ciclo; os da unidade de hazards, quando há parada.
  */
 import * as fmt from '../riscv/format.js';
+import { abiName } from '../riscv/registers.js';
 import { t } from '../i18n/index.js';
 import { esc, COLORS } from './panels.js';
 import { clip, tint, text, box, wire, dot, mux, alu } from './svg.js';
@@ -20,6 +21,9 @@ const LATCH_X = { 'IF/ID': 236, 'ID/EX': 520, 'EX/MEM': 858, 'MEM/WB': 1056 };
 const LATCH_W = 18, LATCH_Y = 56, LATCH_H = 414;
 const STAGES = ['IF', 'ID', 'EX', 'MEM', 'WB'];
 const NO_IMM = new Set(['R', 'R2', 'R4', 'SYS']);
+
+/** Registrador com o nome numérico e o da ABI, como x5 (t0). */
+const rn = (r) => (abiName(r) && abiName(r) !== r ? `${r} (${abiName(r)})` : r);
 
 /** Linhas de informação de um estágio (rótulo, valor), como no painel de cada estágio. */
 function stageInfo(ctx, snap, stage, s) {
@@ -36,12 +40,12 @@ function stageInfo(ctx, snap, stage, s) {
             }
             break;
         case 'ID':
-            for (const [name, r] of ops) out.push([name, r]);
-            if (inst.rd) out.push([t('ui.destination'), inst.rd]);
+            for (const [name, r] of ops) out.push([name, rn(r)]);
+            if (inst.rd) out.push([t('ui.destination'), rn(inst.rd)]);
             if (!NO_IMM.has(inst.def.fmt)) out.push([t('ui.pipe.imm'), String(inst.imm)]);
             break;
         case 'EX':
-            for (const [name, r, v] of ops) if (v !== null) out.push([`${name} (${r})`, fmt.value(v)]);
+            for (const [name, r, v] of ops) if (v !== null) out.push([`${name} = ${rn(r)}`, fmt.value(v)]);
             if (s.total > 1) out.push([t('ui.pipe.progress'), `${s.total - s.remaining} / ${s.total}`]);
             if (s.addr !== null) out.push([t('ui.address'), fmt.address(s.addr)]);
             else if (s.done && s.result !== null && inst.def.cls !== 'jump') out.push([t('ui.pipe.result'), fmt.value(s.result)]);
@@ -54,7 +58,7 @@ function stageInfo(ctx, snap, stage, s) {
             if (inst.def.cls === 'store') out.push([t('ui.pipe.write'), fmt.value(s.b)]);
             break;
         case 'WB':
-            if (inst.rd && inst.rd !== 'x0' && s.result !== null) out.push([inst.rd, fmt.value(s.result)]);
+            if (inst.rd && inst.rd !== 'x0' && s.result !== null) out.push([rn(inst.rd), fmt.value(s.result)]);
             break;
     }
     return out;
@@ -145,8 +149,8 @@ export function pipelineSvg(ctx, snap, focus) {
     out.push(wire([[410, 372], [520, 372]], on(usesImm('ID'))));
     out.push(wire([[254, 96], [520, 96]], on(idOn)));
     if (idOn) {
-        if (I.ID.rs1) out.push(text(426, 192, I.ID.rs1, 'mono tiny val'));
-        if (I.ID.rs2) out.push(text(426, 274, I.ID.rs2, 'mono tiny val'));
+        if (I.ID.rs1) out.push(text(426, 192, rn(I.ID.rs1), 'mono tiny val'));
+        if (I.ID.rs2) out.push(text(426, 274, rn(I.ID.rs2), 'mono tiny val'));
     }
     if (branchInId) {
         const ctlOn = idOn && isCtl('ID');
@@ -230,7 +234,7 @@ export function pipelineSvg(ctx, snap, focus) {
     out.push(wire([[1074, 220], [1094, 220]], on(wbOn && cls('WB') === 'load')));
     out.push(wire([[1074, 300], [1094, 300]], on(wbOn && cls('WB') !== 'load')));
     out.push(wire([[1108, 260], [1150, 260], [1150, 405], [290, 405], [290, 310], [300, 310]], on(wbOn)));
-    if (wbOn && slot.WB.result !== null) out.push(text(720, 400, `${I.WB.rd} ← ${clip(fmt.value(slot.WB.result), 14)}`, 'mono tiny center val'));
+    if (wbOn && slot.WB.result !== null) out.push(text(720, 400, `${rn(I.WB.rd)} ← ${clip(fmt.value(slot.WB.result), 14)}`, 'mono tiny center val'));
 
     // Valores de cada estágio, embaixo.
     for (const st of STAGES) {

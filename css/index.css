@@ -1565,16 +1565,21 @@ ul.fwd {
 svg.datapath .w {
     fill: none;
     stroke: var(--wire);
-    stroke-width: 2.5;
+    stroke-width: 2;
 }
 
 svg.datapath .w.on {
     stroke: var(--accent);
-    stroke-width: 3.5;
+    stroke-width: 3;
 }
 
-svg.datapath .arrowhead {
-    fill: var(--faint);
+svg.datapath .hd {
+    fill: var(--wire);
+    stroke: none;
+}
+
+svg.datapath .hd.on {
+    fill: var(--accent);
 }
 
 svg.datapath .blk {
