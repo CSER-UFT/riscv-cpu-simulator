@@ -219,6 +219,7 @@ export default {
     'ui.exp.timelineTex': 'Timeline (LaTeX)',
     'ui.exp.eventsCsv': 'Event table (CSV)',
     'ui.exp.eventsTex': 'Event table (LaTeX)',
+    'ui.exp.figureSvg': 'Current cycle figure (SVG)',
     'ui.exp.eventsBlank': 'Blank event table (LaTeX)',
     'ui.copyLink': 'Copy link',
     'ui.copyLinkHelp': 'Copies a link that opens this simulation (or this exercise)',

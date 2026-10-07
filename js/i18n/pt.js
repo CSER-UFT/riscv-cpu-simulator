@@ -227,6 +227,7 @@ export default {
     'ui.exp.timelineTex': 'Linha do tempo (LaTeX)',
     'ui.exp.eventsCsv': 'Tabela de eventos (CSV)',
     'ui.exp.eventsTex': 'Tabela de eventos (LaTeX)',
+    'ui.exp.figureSvg': 'Figura do ciclo atual (SVG)',
     'ui.exp.eventsBlank': 'Tabela de eventos em branco (LaTeX)',
     'ui.copyLink': 'Copiar link',
     'ui.copyLinkHelp': 'Copia um link que abre esta simulação (ou este exercício)',

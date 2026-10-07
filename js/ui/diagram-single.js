@@ -29,7 +29,7 @@ export function renderSingle(el, ctx, snap) {
     const control = cls === 'branch' || cls === 'jump';
 
     const svg = `
-<svg class="datapath" viewBox="0 0 1000 470" width="1000" height="470" role="img" aria-label="${esc(t('ui.single.datapath'))}">
+<svg class="datapath" data-figure viewBox="0 0 1000 470" width="1000" height="470" role="img" aria-label="${esc(t('ui.single.datapath'))}">
   <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>
   <!-- Ligações -->
   <polyline class="${on('IF')}" points="90,250 130,250" marker-end="url(#arr)"/>

@@ -11,6 +11,7 @@ import { Viewport } from './ui/viewport.js';
 import { renderExercise } from './ui/exercise.js';
 import { renderCompare } from './ui/compare.js';
 import { timelineCsv, timelineLatex, eventsCsv, eventsLatex, download } from './ui/export.js';
+import { standaloneSvg } from './ui/svg-export.js';
 import { Help, MODEL_SECTION } from './ui/help.js';
 
 const timeline = new Timeline('timeline');
@@ -181,6 +182,11 @@ for (const item of buttons.export.querySelectorAll('[data-export]')) {
             case 'events-csv': return download('eventos.csv', eventsCsv(sim), 'text/csv');
             case 'events-tex': return download('eventos.tex', eventsLatex(sim, false), 'application/x-tex');
             case 'events-blank': return download('eventos-em-branco.tex', eventsLatex(sim, true), 'application/x-tex');
+            case 'figure-svg': {
+                const svg = document.querySelector('#diagram svg[data-figure]');
+                if (c.kind !== 'sim' || !svg) return;
+                return download(`figura-ciclo-${sim.states[c.curState]?.cycle ?? c.curState}.svg`, standaloneSvg(svg), 'image/svg+xml');
+            }
         }
     });
 }
@@ -218,7 +224,13 @@ function setButtons(kind) {
     buttons.exercise.classList.toggle('hidden', kind !== 'sim');
     buttons.export.classList.toggle('hidden', !kind);
     buttons.link.classList.toggle('hidden', !kind);
+    // A figura em SVG existe para os modelos desenhados em SVG.
+    const model = tabManager.currentContents()?.sim?.model;
+    buttons.export.querySelector('[data-export="figure-svg"]').classList.toggle('hidden', kind !== 'sim' || !SVG_MODELS.has(model));
 }
+
+/** Modelos cujo diagrama é uma figura SVG exportável. */
+const SVG_MODELS = new Set(['single']);
 
 tabManager.addEventListener('tab-unset', () => {
     timeline.clear();
