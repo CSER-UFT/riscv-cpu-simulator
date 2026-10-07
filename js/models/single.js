@@ -7,7 +7,7 @@ import * as memory from '../riscv/memory.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
-import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
+import { createHierarchy, access as hierAccess, hierarchyStats, accessParts } from '../riscv/hierarchy.js';
 import { t } from '../i18n/index.js';
 import { normalizeConfig } from '../core/config.js';
 import { Recorder } from '../core/recorder.js';
@@ -34,7 +34,7 @@ export function simulateSingle(program, userConfig = {}) {
     const xlen = program.xlen;
     const arch = initialState(program, { exampleValues: cfg.exampleValues });
 
-    const S = { cycle: 0, pc: TEXT_BASE, halted: false, regs: { x: arch.x, f: arch.f }, mem: arch.mem, cur: null, phase: null, cache: createHierarchy(cfg.memory) };
+    const S = { cycle: 0, pc: TEXT_BASE, halted: false, regs: { x: arch.x, f: arch.f }, mem: arch.mem, cur: null, phase: null, cache: createHierarchy(cfg.memory, program) };
     const dyn = [];
     const warnings = [];
     const stats = { instructions: 0, branches: 0, takenBranches: 0, loads: 0, stores: 0 };
@@ -47,9 +47,7 @@ export function simulateSingle(program, userConfig = {}) {
     const memNote = (kind, addr) => {
         if (!S.cache || (kind === 'inst' && !cfg.memory.levels.L1I.enabled)) return '';
         const r = hierAccess(S.cache, cfg.memory, kind, addr);
-        const parts = r.path.map((p) => t(p.hit ? 'mem.hitAt' : 'mem.missAt', { level: p.level }));
-        if (r.hitLevel === 'MEM') parts.push(t('mem.main'));
-        return ' ' + t('mem.pathNoTime', { path: parts.join(', ') });
+        return ' ' + t('mem.pathNoTime', { path: accessParts(r).join(', ') });
     };
     const step = (phase, msg, focus = []) => {
         S.phase = phase;

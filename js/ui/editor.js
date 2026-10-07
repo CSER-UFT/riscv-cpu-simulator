@@ -230,6 +230,17 @@ export class Editor {
                         <td><input type="number" name="lv-lat" value="${l.latency}" min="1" /></td></tr>`).join('')}
                     </table>
                     <p class="note">${t('ed.memoryHelp')}</p>
+                    ${check('vmEnabled', c.memory.vm.enabled, t('ed.vmEnabled'))}
+                    <div class="vm-fields latencies">
+                        ${num('vmPage', c.memory.vm.pageSize, 64, 65536, t('ed.vmPage'), 'small')}
+                        ${num('vmTlbEntries', c.memory.vm.tlbEntries, 1, 1024, t('ed.vmTlbEntries'), 'small')}
+                        ${num('vmTlbAssoc', c.memory.vm.tlbAssoc, 1, 1024, t('ed.vmTlbAssoc'), 'small')}
+                        ${num('vmTlbLatency', c.memory.vm.tlbLatency, 0, 100, t('ed.vmTlbLatency'), 'small')}
+                        ${num('vmFrames', c.memory.vm.frames, 1, 4096, t('ed.vmFrames'), 'small')}
+                        ${num('vmFault', c.memory.vm.faultLatency, 1, 1000000, t('ed.vmFault'), 'small')}
+                        ${check('vmPreload', c.memory.vm.preload, t('ed.vmPreload'))}
+                    </div>
+                    <p class="note vm-fields">${t('ed.vmHelp')}</p>
                 </div>
             </fieldset>
             <fieldset><legend>${t('ed.timing')}</legend>
@@ -254,6 +265,7 @@ export class Editor {
         });
         this.configEl.querySelector('select[name="mode"]').addEventListener('change', () => this.updateModeFields());
         this.configEl.querySelector('[name="memEnabled"]').addEventListener('change', () => this.updateModeFields());
+        this.configEl.querySelector('[name="vmEnabled"]').addEventListener('change', () => this.updateModeFields());
         this.configEl.querySelector('[name="timingMode"]').addEventListener('change', () => this.updateModeFields());
         this.configEl.addEventListener('input', () => this.updateTiming());
         this.bindGroupRows();
@@ -295,6 +307,8 @@ export class Editor {
         this.updateTiming();
         const memOn = this.configEl.querySelector('[name="memEnabled"]').checked;
         this.configEl.querySelector('.mem-fields').classList.toggle('hidden', !memOn);
+        const vmOn = this.configEl.querySelector('[name="vmEnabled"]').checked;
+        for (const el of this.configEl.querySelectorAll('.vm-fields')) el.classList.toggle('hidden', !vmOn);
     }
 
     /** Mostra o período resultante da configuração do formulário. */
@@ -339,6 +353,16 @@ export class Editor {
                     assoc: Number(row.querySelector('[name="lv-assoc"]').value),
                     latency: Number(row.querySelector('[name="lv-lat"]').value),
                 }])),
+                vm: {
+                    enabled: get('vmEnabled').checked,
+                    pageSize: n('vmPage'),
+                    tlbEntries: n('vmTlbEntries'),
+                    tlbAssoc: n('vmTlbAssoc'),
+                    tlbLatency: n('vmTlbLatency'),
+                    frames: n('vmFrames'),
+                    faultLatency: n('vmFault'),
+                    preload: get('vmPreload').checked,
+                },
             },
             latency: {},
             groups: [],

@@ -74,6 +74,57 @@ export function memoryPanel(ctx, snap, focus) {
         ${ws.length ? `<table class="mem"><tr><th>${t('ui.address')}</th><th>${t('ui.label')}</th><th>${t('ui.integer')}</th><th>Float</th></tr>${rows}</table>` : ''}${more}${empty}</section>`;
 }
 
+const hex = (n) => `0x${Number(n).toString(16)}`;
+
+/**
+ * Memória virtual: a última tradução decomposta (VPN, deslocamento, TLB, PTEs lidas, endereço físico),
+ * o conteúdo da TLB e a tabela de páginas.
+ */
+export function vmPanel(ctx, snap, focus) {
+    const vc = ctx.sim.config.memory.vm;
+    const v = snap.cache?.vm;
+    if (!v) return '';
+    const geo = v.geo;
+    const last = v.last;
+    const st = v.stats;
+    const rate = st.translations ? ((100 * st.tlbHits) / st.translations).toFixed(0) : '0';
+    let lastHtml = `<p class="note">${t('ui.mem.none')}</p>`;
+    if (last) {
+        const idx = [];
+        let rest = last.vpn;
+        for (let i = geo.levels - 1; i >= 0; i--) { idx[i] = rest % 2 ** geo.bits[i]; rest = Math.floor(rest / 2 ** geo.bits[i]); }
+        const fields = idx.map((x, i) => `<span class="vm-f vpn" title="VPN[${geo.levels - 1 - i}]">${t('ui.vm.vpnField', { i: geo.levels - 1 - i, bits: geo.bits[i] })}<b>${x}</b></span>`).join('')
+            + `<span class="vm-f off">${t('ui.vm.offField', { bits: geo.offsetBits })}<b>${hex(last.offset)}</b></span>`;
+        const walks = last.walks.map((w, k) => `<table class="cache vm-walk"><tr><th colspan="5">${t(k === 0 ? 'ui.vm.walk' : 'ui.vm.rewalk')}</th></tr>
+            <tr><th>${t('ui.vm.level')}</th><th>${t('ui.vm.index')}</th><th>${t('ui.vm.pteAddr')}</th><th>${t('ui.vm.servedBy')}</th><th>PTE</th></tr>
+            ${w.map((r) => `<tr><td class="num">${geo.levels - 1 - r.level}</td><td class="num">${r.index}</td><td class="num">${hex(r.addr)}</td>
+                <td>${r.hitLevel === 'MEM' ? t('mem.main') : r.hitLevel} (${r.latency})</td><td class="${r.valid ? '' : 'warn'}">${t(r.valid ? 'ui.vm.valid' : 'ui.vm.invalid')}</td></tr>`).join('')}</table>`).join('');
+        const fault = last.fault ? `<p class="note warn">${esc(t(last.fault.evicted === null ? 'ui.vm.fault' : 'ui.vm.faultEvict', { frame: last.fault.frame, old: last.fault.evicted === null ? '' : hex(last.fault.evicted), n: vc.faultLatency }))}</p>` : '';
+        lastHtml = `<p class="note">${esc(t('ui.vm.last', { va: hex(last.vaddr), pa: hex(last.paddr), n: last.latency }))}
+                <span class="badge ${last.tlbHit ? 'hit' : 'miss'}">${t(last.tlbHit ? 'ui.vm.tlbHit' : 'ui.vm.tlbMiss')}</span></p>
+            <div class="vm-split">${fields}</div>
+            <p class="note">${esc(t('ui.vm.pa', { ppn: last.ppn, size: vc.pageSize, off: hex(last.offset), pa: hex(last.paddr) }))}</p>
+            ${walks}${fault}`;
+    }
+    const tlbRows = v.tlb.map((ways, i) => `<tr><td class="num">${i}</td>${ways.map((e) => {
+        const cur = last && e.valid && e.vpn === last.vpn;
+        return `<td class="num ${e.valid ? '' : 'dim'} ${cur ? 'cur' : ''}">${e.valid ? `${hex(e.vpn)} → ${e.ppn}` : '·'}</td>`;
+    }).join('')}</tr>`).join('');
+    const pages = Object.entries(v.pages).map(([vpn, pg]) => [Number(vpn), pg]).sort((a, b) => a[0] - b[0]);
+    const pageRows = pages.slice(0, 24).map(([vpn, pg]) => `<tr class="${last && last.vpn === vpn ? 'cur' : ''}"><td class="num">${hex(vpn)}</td>
+        <td class="num">${pg.present ? pg.ppn : '-'}</td><td>${t(pg.present ? 'ui.vm.present' : 'ui.vm.onDisk')}</td><td class="num">${pg.lastUse}</td></tr>`).join('');
+    return `<section class="panel hierarchy vm ${focus.has('cache') ? 'focus' : ''}" data-part="vm">
+        <h3>${t('ui.vm.title')} <span class="sub">${esc(t('ui.vm.info', { scheme: vc.scheme === 'sv39' ? 'Sv39' : 'Sv32', page: vc.pageSize, frames: vc.frames, root: hex(v.nodes['']) }))}</span></h3>
+        ${lastHtml}
+        <div class="level"><div class="level-head"><b>TLB</b><span class="sub">${esc(t('ui.vm.tlbInfo', { n: vc.tlbEntries, assoc: vc.tlbAssoc, lat: vc.tlbLatency }))}</span></div>
+            <p class="note">${t('ui.vm.tlbStats', { hits: st.tlbHits, misses: st.tlbMisses, rate, faults: st.faults, evictions: st.evictions })}</p>
+            <table class="cache"><tr><th>${t('ui.set')}</th>${Array.from({ length: vc.tlbAssoc }, (_, w) => `<th>${t('ui.vm.way', { w })}</th>`).join('')}</tr>${tlbRows}</table></div>
+        <div class="level"><div class="level-head"><b>${t('ui.vm.pageTable')}</b><span class="sub">${esc(t('ui.vm.pageTableInfo', { n: pages.filter(([, p]) => p.present).length, frames: vc.frames }))}</span></div>
+            <table class="cache"><tr><th>VPN</th><th>${t('ui.vm.frame')}</th><th>${t('ui.vm.state')}</th><th>${t('ui.vm.lastUse')}</th></tr>${pageRows}</table>
+            ${pages.length > 24 ? `<p class="note">${t('ui.vm.morePages', { n: pages.length - 24 })}</p>` : ''}</div>
+    </section>`;
+}
+
 /** Hierarquia de memória: um bloco por nível habilitado, com o conteúdo dos conjuntos e o último acesso. */
 export function cachePanel(ctx, snap, focus) {
     const cfg = ctx.sim.config.memory;
@@ -105,10 +156,10 @@ export function cachePanel(ctx, snap, focus) {
     }).join('');
     const mainHit = last && last.hitLevel === 'MEM';
     const lastText = last
-        ? t('ui.mem.last', { kind: t(last.kind === 'inst' ? 'ui.mem.inst' : 'ui.mem.data'), addr: fmt.address(BigInt(last.addr)), level: last.hitLevel === 'MEM' ? t('mem.main') : last.hitLevel, n: last.latency })
+        ? t(last.paddr ? 'ui.mem.lastVirtual' : 'ui.mem.last', { kind: t(last.kind === 'inst' ? 'ui.mem.inst' : 'ui.mem.data'), addr: fmt.address(BigInt(last.addr)), pa: last.paddr ? fmt.address(BigInt(last.paddr)) : '', level: last.hitLevel === 'MEM' ? t('mem.main') : last.hitLevel, n: last.latency })
         : t('ui.mem.none');
-    return `<section class="panel hierarchy ${focus.has('cache') ? 'focus' : ''}" data-part="cache">
-        <h3>${t('ui.mem.title')}</h3>
+    return `${vmPanel(ctx, snap, focus)}<section class="panel hierarchy ${focus.has('cache') ? 'focus' : ''}" data-part="cache">
+        <h3>${t('ui.mem.title')}${h.vm ? ` <span class="sub">${t('ui.vm.physical')}</span>` : ''}</h3>
         <p class="note">${esc(lastText)}</p>
         ${levels}
         <div class="level ${mainHit ? 'miss' : ''}"><div class="level-head"><b>${t('ui.mem.mainShort')}</b><span class="sub">${t('ui.mem.mainInfo', { lat: cfg.mainLatency, n: h.mainAccesses })}</span>
@@ -169,6 +220,14 @@ export function statsRows(sim) {
         for (const [name, l] of Object.entries(s.memory.levels)) {
             const total = l.hits + l.misses;
             rows.push([t('stats.levelRate', { level: name }), total ? `${((100 * l.hits) / total).toFixed(1)}% (${l.hits}/${total})` : '-']);
+        }
+        if (s.memory.vm) {
+            const v = s.memory.vm;
+            rows.push([t('stats.tlbRate'), v.translations ? `${((100 * v.tlbHits) / v.translations).toFixed(1)}% (${v.tlbHits}/${v.translations})` : '-']);
+            rows.push([t('stats.pageWalks'), v.walks]);
+            rows.push([t('stats.pageFaults'), v.faults]);
+            rows.push([t('stats.evictions'), v.evictions]);
+            rows.push([t('stats.translation'), v.translations ? (v.cycles / v.translations).toFixed(2) : '0']);
         }
         if (s.memory.amatData) rows.push([t('stats.amatData'), s.memory.amatData.toFixed(2)]);
         if (s.memory.amatInst) rows.push([t('stats.amatInst'), s.memory.amatInst.toFixed(2)]);

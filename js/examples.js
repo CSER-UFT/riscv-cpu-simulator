@@ -257,4 +257,55 @@ laco:
     bnez  s0, passada
 `,
     },
+    {
+        id: 'vm',
+        name: 'Memória virtual (TLB e faltas de página)',
+        nameEn: 'Virtual memory (TLB and page faults)',
+        config: {
+            mode: 'pipeline',
+            maxCycles: 5000,
+            memory: {
+                enabled: true,
+                mainLatency: 20,
+                levels: {
+                    L1I: { enabled: true, size: 128, blockSize: 16, assoc: 2, latency: 1 },
+                    L1D: { enabled: true, size: 128, blockSize: 16, assoc: 2, latency: 1 },
+                    L2: { enabled: true, size: 1024, blockSize: 32, assoc: 4, latency: 6 },
+                    L3: { enabled: false },
+                },
+                vm: { enabled: true, pageSize: 128, tlbEntries: 2, tlbAssoc: 2, tlbLatency: 0, frames: 8, faultLatency: 50, preload: false },
+            },
+        },
+        code: `# Matriz de 4 linhas de 128 bytes: com páginas de 128 bytes, cada linha fica em uma página.
+# Sem pré-carga, o primeiro toque em cada página é uma falta de página. A TLB tem só 2
+# entradas, e uma delas fica com a página do código: percorrer por linhas falha na TLB
+# só ao mudar de página; percorrer por colunas troca de página a cada acesso.
+.data
+m:  .space 512
+.text
+    li    t2, 0
+    la    a0, m           # por linhas
+    li    a1, 128
+linhas:
+    lw    t0, 0(a0)
+    add   t2, t2, t0
+    addi  a0, a0, 4
+    addi  a1, a1, -1
+    bnez  a1, linhas
+    li    s0, 0           # por colunas
+    li    t1, 128
+colunas:
+    la    a0, m
+    add   a0, a0, s0
+    li    a1, 4
+coluna:
+    lw    t0, 0(a0)
+    add   t2, t2, t0
+    addi  a0, a0, 128
+    addi  a1, a1, -1
+    bnez  a1, coluna
+    addi  s0, s0, 4
+    blt   s0, t1, colunas
+`,
+    },
 ];

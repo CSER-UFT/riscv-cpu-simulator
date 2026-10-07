@@ -11,7 +11,7 @@
  * As decisões de avanço são tomadas ao fim de cada ciclo, a partir do estado de todos os estágios.
  */
 import * as memory from '../riscv/memory.js';
-import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
+import { createHierarchy, access as hierAccess, hierarchyStats, describeAccess } from '../riscv/hierarchy.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
@@ -35,7 +35,7 @@ export function simulatePipeline(program, userConfig = {}) {
         halted: false,
         regs: { x: arch.x, f: arch.f },
         mem: arch.mem,
-        cache: createHierarchy(cfg.memory),
+        cache: createHierarchy(cfg.memory, program),
         bht: new Array(cfg.bhtEntries).fill(cfg.predictor === '2bit' ? 1 : 0),
         stages: { IF: null, ID: null, EX: null, MEM: null, WB: null },
         forwards: [],
@@ -59,12 +59,6 @@ export function simulatePipeline(program, userConfig = {}) {
     const A = (x) => `//${fmt.address(x)}//`;
     const R = (r) => `**${r}**`;
     const taken = (b) => t(b ? 'common.taken' : 'common.notTaken');
-
-    function describeAccess(r) {
-        const parts = r.path.map((p) => t(p.hit ? 'mem.hitAt' : 'mem.missAt', { level: p.level }));
-        if (r.hitLevel === 'MEM') parts.push(t('mem.main'));
-        return t('mem.path', { path: parts.join(', '), n: r.latency });
-    }
 
     function publicSlot(s) {
         return {

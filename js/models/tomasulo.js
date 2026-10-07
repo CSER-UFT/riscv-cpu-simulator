@@ -21,7 +21,7 @@
  * No modo ROB os stores escrevem na memória apenas no commit.
  */
 import * as memory from '../riscv/memory.js';
-import { createHierarchy, access as hierAccess, hierarchyStats } from '../riscv/hierarchy.js';
+import { createHierarchy, access as hierAccess, hierarchyStats, describeAccess } from '../riscv/hierarchy.js';
 import { initialState, readReg, writeReg, effectiveAddress, indexAt, resolveControl } from '../riscv/machine.js';
 import { TEXT_BASE } from '../riscv/parser.js';
 import * as fmt from '../riscv/format.js';
@@ -65,7 +65,7 @@ export function simulate(program, userConfig = {}) {
         mem: arch.mem,
         cdb: [],
         bht: new Array(cfg.bhtEntries).fill(cfg.predictor === '2bit' ? 1 : 0),
-        cache: createHierarchy(cfg.memory),
+        cache: createHierarchy(cfg.memory, program),
         units: {},
     };
 
@@ -150,12 +150,6 @@ export function simulate(program, userConfig = {}) {
     }
 
     /** Descrição do caminho de um acesso na hierarquia, por exemplo "L1D falha, L2 acerto: 7 ciclos". */
-    function describeAccess(r) {
-        const parts = r.path.map((p) => t(p.hit ? 'mem.hitAt' : 'mem.missAt', { level: p.level }));
-        if (r.hitLevel === 'MEM') parts.push(t('mem.main'));
-        return t('mem.path', { path: parts.join(', '), n: r.latency });
-    }
-
     /** Latência de um acesso de dados: pela hierarquia, se habilitada, ou a latência fixa indicada. */
     function cacheLatency(addr, fallback) {
         if (!S.cache) return { latency: fallback, info: '' };

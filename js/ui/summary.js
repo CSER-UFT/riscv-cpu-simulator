@@ -34,6 +34,8 @@ export function configSummary(cfg) {
         for (const [name, l] of Object.entries(cfg.memory.levels))
             if (l.enabled) items.push(t('summary.level', { name, size: l.size, block: l.blockSize, assoc: l.assoc, lat: l.latency }));
         items.push(t('summary.main', { lat: cfg.memory.mainLatency }));
+        const v = cfg.memory.vm;
+        if (v?.enabled) items.push(t('summary.vm', { scheme: v.scheme === 'sv39' ? 'Sv39' : 'Sv32', page: v.pageSize, n: v.tlbEntries, assoc: v.tlbAssoc, frames: v.frames, fault: v.faultLatency }));
     }
     return items;
 }

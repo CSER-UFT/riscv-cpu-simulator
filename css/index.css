@@ -1736,6 +1736,41 @@ td.on {
     color: var(--warn);
 }
 
+/* Memória virtual */
+
+.vm-split {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0;
+    font-family: var(--mono, monospace);
+    font-size: 0.85em;
+}
+
+.vm-f {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.vm-f.vpn {
+    background: var(--accent-soft);
+}
+
+.vm-f b {
+    margin-left: 2px;
+}
+
+.panel.hierarchy table.vm-walk {
+    margin-top: 6px;
+}
+
+.panel.hierarchy td.cur,
+.panel.hierarchy tr.cur td {
+    background: var(--accent-soft);
+    font-weight: 600;
+}
+
 table.levels input[type='number'] {
     width: 70px;
 }

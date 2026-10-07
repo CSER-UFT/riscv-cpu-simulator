@@ -44,6 +44,7 @@ export const DEFAULT_CONFIG = {
             L2: { enabled: true, size: 1024, blockSize: 32, assoc: 4, latency: 6 },
             L3: { enabled: false, size: 4096, blockSize: 64, assoc: 8, latency: 20 },
         },
+        vm: { enabled: false, pageSize: 4096, tlbEntries: 4, tlbAssoc: 4, tlbLatency: 0, frames: 8, faultLatency: 100, preload: true },
     },
     groups: [
         { name: 'Load', count: 3, classes: ['load', 'store'], units: 0, pipelined: true },
@@ -97,7 +98,18 @@ function normalizeMemory(partial) {
             latency: intIn(l.latency, 1, 1000, dl.latency),
         };
     }
-    return { enabled: bool(pm.enabled, d.enabled), mainLatency: intIn(pm.mainLatency, 1, 10000, d.mainLatency), levels };
+    const pv = pm.vm ?? {}, dv = d.vm;
+    const vm = {
+        enabled: bool(pv.enabled, dv.enabled),
+        pageSize: intIn(pv.pageSize, 1, 1 << 16, dv.pageSize),
+        tlbEntries: intIn(pv.tlbEntries, 1, 1024, dv.tlbEntries),
+        tlbAssoc: intIn(pv.tlbAssoc, 1, 1024, dv.tlbAssoc),
+        tlbLatency: intIn(pv.tlbLatency, 0, 100, dv.tlbLatency),
+        frames: intIn(pv.frames, 1, 4096, dv.frames),
+        faultLatency: intIn(pv.faultLatency, 1, 1000000, dv.faultLatency),
+        preload: bool(pv.preload, dv.preload),
+    };
+    return { enabled: bool(pm.enabled, d.enabled), mainLatency: intIn(pm.mainLatency, 1, 10000, d.mainLatency), levels, vm };
 }
 
 /** Normaliza o modelo de tempo de ciclo. Atrasos em picossegundos. */
@@ -147,6 +159,16 @@ export function normalizeConfig(partial = {}) {
     };
     for (const k of LATENCY_IDS)
         c.latency[k] = intIn(partial.latency?.[k], 1, 100, d.latency[k]);
+    // O esquema de paginação acompanha o XLEN: Sv32 no RV32 e Sv39 no RV64.
+    c.memory.vm.scheme = c.xlen === 64 ? 'sv39' : 'sv32';
+    if (!c.memory.enabled) c.memory.vm.enabled = false;
+    if (c.memory.vm.enabled) {
+        const v = c.memory.vm;
+        if (!isPow2(v.pageSize) || v.pageSize < 64)
+            errors.push(t('config.vmPage'));
+        if (!isPow2(v.tlbEntries) || !isPow2(v.tlbAssoc) || v.tlbAssoc > v.tlbEntries)
+            errors.push(t('config.vmTlb'));
+    }
 
     if (c.memory.enabled) {
         for (const [name, l] of Object.entries(c.memory.levels)) {

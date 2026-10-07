@@ -89,6 +89,31 @@ export const CONFIGS = {
             },
         },
     },
+    'pipeline com memória virtual, páginas pequenas e poucos quadros': {
+        mode: 'pipeline', predictor: '2bit',
+        memory: {
+            enabled: true, mainLatency: 10,
+            levels: {
+                L1I: { enabled: true, size: 64, blockSize: 16, assoc: 2, latency: 1 },
+                L1D: { enabled: true, size: 64, blockSize: 16, assoc: 2, latency: 1 },
+                L2: { enabled: true, size: 256, blockSize: 32, assoc: 4, latency: 4 },
+                L3: { enabled: false },
+            },
+            vm: { enabled: true, pageSize: 64, tlbEntries: 2, tlbAssoc: 1, tlbLatency: 1, frames: 3, faultLatency: 7, preload: false },
+        },
+    },
+    'ROB com memória virtual': {
+        mode: 'rob', predictor: '2bit', issueWidth: 2, commitWidth: 2,
+        memory: {
+            enabled: true, mainLatency: 15,
+            levels: {
+                L1I: { enabled: true, size: 64, blockSize: 16, assoc: 2, latency: 1 },
+                L1D: { enabled: true, size: 64, blockSize: 8, assoc: 2, latency: 1 },
+                L2: { enabled: false }, L3: { enabled: false },
+            },
+            vm: { enabled: true, pageSize: 128, tlbEntries: 4, tlbAssoc: 4, frames: 4, faultLatency: 20 },
+        },
+    },
     'ROB BTFN, latências altas': {
         mode: 'rob', predictor: 'btfn', issueWidth: 2, commitWidth: 2,
         latency: { address: 3, load: 5, alu: 3, branch: 4, jump: 2, mul: 9, div: 20, fadd: 6, fmul: 8, fdiv: 15 },
