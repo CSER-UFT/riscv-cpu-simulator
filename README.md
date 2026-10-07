@@ -11,9 +11,11 @@ O simulador roda inteiramente no navegador (HTML e JavaScript, sem dependências
 ## Modelos de processador
 
 * **Monociclo**: cada instrução em um ciclo, com o caminho de dados desenhado e os blocos, ligações, valores e sinais de controle destacados a cada passo (busca, decodificação, execução, memória, escrita e atualização do PC).
-* **Pipeline de 5 estágios** (IF, ID, EX, MEM, WB): encaminhamento opcional (EX/MEM e MEM/WB), detecção de hazards com bolhas, desvios resolvidos em EX ou em ID, previsão de desvios, operações de várias etapas no EX (multiplicação, divisão, ponto flutuante) e hierarquia de memória no IF e no MEM.
+* **Pipeline de 5 estágios** (IF, ID, EX, MEM, WB): encaminhamento opcional (EX/MEM e MEM/WB), detecção de hazards com bolhas, desvios resolvidos em EX ou em ID, previsão de desvios, operações de várias etapas no EX (multiplicação, divisão, ponto flutuante) e hierarquia de memória no IF e no MEM. O diagrama é o caminho de dados com pipeline do Patterson e Hennessy, com os registradores de pipeline, as unidades de detecção de hazards e de encaminhamento, a instrução de cada estágio no alto e os fios acesos conforme o uso, o encaminhamento e as paradas.
 * **Tomasulo clássico**: estações de reserva, renomeação pelo nome da estação e difusão pelo CDB; sem especulação.
 * **Tomasulo com ROB**: buffer de reordenação, commit em ordem, especulação com previsão de desvios e correção da previsão errada no commit ou já na resolução do desvio.
+
+Nos dois modos do Tomasulo, o diagrama segue a estrutura do Hennessy e Patterson: fila de instruções, ROB e banco de registradores com o campo Qi no alto, barramentos de operações e de operandos, estações de reserva de cada grupo com a unidade funcional embaixo e o CDB voltando para estações, registradores e ROB, tudo gerado a partir da configuração.
 
 No Tomasulo são configuráveis os grupos de estações (nome, quantidade e classes de instrução aceitas), as unidades funcionais de cada grupo (uma por estação, ou um número compartilhado, com ou sem pipeline), as latências, as larguras de emissão, de CDB e de commit, o tamanho do ROB, o preditor e o encaminhamento de store para load.
 
@@ -34,7 +36,7 @@ Como o ciclo do monociclo executa uma instrução inteira e o do pipeline e do T
 * **Passo a passo**: cada ciclo é dividido em passos com uma explicação do que acontece, e a linha do tempo mostra o estágio de cada instrução em cada ciclo.
 * **Exercício**: o aluno preenche, para cada instrução, o ciclo de cada evento (Issue, início e fim da execução, Write e Commit no Tomasulo; IF, ID, EX, MEM e WB no pipeline) e o simulador corrige. O link copiado de um exercício abre diretamente nele.
 * **Comparar**: executa o mesmo programa com outra configuração e mostra o speedup pelo tempo de execução, decomposto em CPI e período do clock, além das estatísticas, das diferenças de configuração e das duas linhas do tempo lado a lado.
-* **Exportar**: linha do tempo e tabela de eventos em CSV e em LaTeX, inclusive a tabela em branco para provas e listas. As tabelas LaTeX usam cabeçalho com fundo `tabAzul` e texto branco, `\hline` e não usam booktabs.
+* **Exportar**: linha do tempo e tabela de eventos em CSV e em LaTeX, inclusive a tabela em branco para provas e listas. As tabelas LaTeX usam cabeçalho com fundo `tabAzul` e texto branco, `\hline` e não usam booktabs. A figura do ciclo atual (monociclo, pipeline ou Tomasulo) é salva em SVG, com as cores do tema claro, para slides e documentos.
 * **Copiar link**: gera um endereço que abre a mesma simulação, comparação ou exercício.
 
 ## Linguagem aceita
@@ -89,7 +91,7 @@ js/core/recorder.js      passos, linha do tempo e instantâneos com compartilham
 js/core/timing.js        período do clock e tempo de execução
 js/i18n/                 textos da interface em português e inglês
 js/help/                 ajuda (manual do usuário) em português e inglês
-js/ui/                   interface: diagramas, linha do tempo, editor, exercício, comparação, exportação
+js/ui/                   interface: diagramas (figuras SVG do pipeline e do Tomasulo), linha do tempo, editor, exercício, comparação, exportação
 js/examples.js           programas de exemplo
 test/                    testes automatizados (node --test)
 ```
@@ -104,7 +106,7 @@ Requer Node.js 20 ou mais recente, sem dependências.
 npm test
 ```
 
-A suíte verifica o montador, a semântica das instruções, os dicionários de tradução e o comportamento temporal de cada modelo (dependências RAW, WAR e WAW, encaminhamento, bolhas, penalidades de desvio, conflitos estruturais, de CDB e de unidade funcional, especulação, commit em ordem, encaminhamento de store para load, hierarquia de memória e memória virtual). O teste principal compara o estado final de cada modelo com o do simulador funcional de referência para programas escritos à mão e para programas gerados aleatoriamente, em dezenove configurações de hardware diferentes. A quantidade de programas aleatórios pode ser alterada com a variável `RANDOM_PROGRAMS`.
+A suíte verifica o montador, a semântica das instruções, os dicionários de tradução e o comportamento temporal de cada modelo (dependências RAW, WAR e WAW, encaminhamento, bolhas, penalidades de desvio, conflitos estruturais, de CDB e de unidade funcional, especulação, commit em ordem, encaminhamento de store para load, hierarquia de memória e memória virtual). O teste principal compara o estado final de cada modelo com o do simulador funcional de referência para programas escritos à mão e para programas gerados aleatoriamente, em dezenove configurações de hardware diferentes; as figuras do pipeline e do Tomasulo são desenhadas em todos os passos dos exemplos. A quantidade de programas aleatórios pode ser alterada com a variável `RANDOM_PROGRAMS`.
 
 ## Execução local
 
