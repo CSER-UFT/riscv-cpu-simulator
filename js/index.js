@@ -230,7 +230,7 @@ function setButtons(kind) {
 }
 
 /** Modelos cujo diagrama é uma figura SVG exportável. */
-const SVG_MODELS = new Set(['single']);
+const SVG_MODELS = new Set(['single', 'pipeline']);
 
 tabManager.addEventListener('tab-unset', () => {
     timeline.clear();

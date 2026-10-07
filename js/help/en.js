@@ -88,10 +88,12 @@ export default {
 <p>The classic RISC-V pipeline: <strong>IF</strong> (fetch), <strong>ID</strong> (decode and register read), <strong>EX</strong> (execute), <strong>MEM</strong> (memory access) and <strong>WB</strong> (write back). One instruction enters per cycle and instructions move in order. Without stalls each instruction finishes 5 cycles after being fetched and the pipeline completes one instruction per cycle.</p>
 <h3>The diagram</h3>
 <ul>
-    <li>Each stage shows its instruction and data: PC and prediction in IF; registers read and immediate in ID; operands, result or address in EX; address and value in MEM; register and value written in WB. An empty stage shows a <em>bubble</em>.</li>
-    <li>Between stages are the pipeline registers (IF/ID, ID/EX, EX/MEM, MEM/WB).</li>
-    <li>The <strong>hazard detection unit</strong> tells when an instruction is stalled in ID and why. The stalled instruction has a dashed outline.</li>
-    <li>The <strong>forwarding unit</strong> lists the values forwarded in the cycle (register, source EX/MEM or MEM/WB and value), and the matching arrows in the diagram light up.</li>
+    <li>The diagram is the Patterson and Hennessy pipelined datapath: PC, instruction memory, register file, immediate generator, control, ALU with the forwarding and ALUSrc multiplexers, data memory and the MemtoReg multiplexer, separated by the IF/ID, ID/EX, EX/MEM and MEM/WB pipeline registers. The branch target adder sits in the stage where branches are resolved (EX, or ID with the comparator).</li>
+    <li>At the top of each stage is the instruction in it, in its color (dashed when stalled; <em>bubble</em> when empty). At the bottom, its data: PC and prediction in IF; registers read and immediate in ID; operands, result or address in EX; address and value in MEM; register and value written in WB. The main values also appear over the wires.</li>
+    <li>Wires light up when the instruction in the stage uses them: the immediate only for instructions with an immediate, the data memory only for loads and stores, the write only when there is a destination register, the branch target path when the branch is taken.</li>
+    <li>The <strong>hazard detection unit</strong> lights up when an instruction stalls in ID, together with its dashed signals (PCWrite, IF/ID write and the bubble in the control); the reason appears below the drawing.</li>
+    <li>The <strong>forwarding unit</strong> lists the forwards of the cycle, and the wires from EX/MEM or MEM/WB to the ALU multiplexers light up in green. Without forwarding, the unit is shown off and the multiplexers disappear.</li>
+    <li>The Export menu saves the current cycle figure as SVG.</li>
 </ul>
 <h3>Hazards and penalties</h3>
 <table>

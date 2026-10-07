@@ -88,10 +88,12 @@ export default {
 <p>O pipeline clássico do RISC-V: <strong>IF</strong> (busca), <strong>ID</strong> (decodificação e leitura de registradores), <strong>EX</strong> (execução), <strong>MEM</strong> (acesso à memória) e <strong>WB</strong> (escrita do resultado). Uma instrução entra por ciclo e as instruções avançam em ordem. Sem paradas, cada instrução termina 5 ciclos depois de buscada e o pipeline conclui uma instrução por ciclo.</p>
 <h3>O diagrama</h3>
 <ul>
-    <li>Cada estágio mostra a instrução que está nele e os seus dados: PC e previsão no IF; registradores lidos e imediato no ID; operandos, resultado ou endereço no EX; endereço e valor no MEM; registrador e valor escritos no WB. Um estágio vazio mostra <em>bolha</em>.</li>
-    <li>Entre os estágios ficam os registradores de pipeline (IF/ID, ID/EX, EX/MEM, MEM/WB).</li>
-    <li>A <strong>unidade de detecção de hazards</strong> informa quando uma instrução fica parada em ID e por quê. A instrução parada tem contorno tracejado.</li>
-    <li>A <strong>unidade de encaminhamento</strong> lista os valores encaminhados no ciclo (registrador, origem EX/MEM ou MEM/WB e valor), e as setas correspondentes no diagrama acendem.</li>
+    <li>O diagrama é o caminho de dados com pipeline do Patterson e Hennessy: PC, memória de instruções, banco de registradores, gerador de imediato, controle, ALU com os multiplexadores de encaminhamento e de ALUSrc, memória de dados e o multiplexador MemtoReg, separados pelos registradores de pipeline IF/ID, ID/EX, EX/MEM e MEM/WB. O somador do destino do desvio fica no estágio em que os desvios são resolvidos (EX, ou ID com o comparador).</li>
+    <li>No alto de cada estágio aparece a instrução que está nele, na cor dela (tracejada quando parada; <em>bolha</em> quando vazio). Embaixo, os seus dados: PC e previsão no IF; registradores lidos e imediato no ID; operandos, resultado ou endereço no EX; endereço e valor no MEM; registrador e valor escritos no WB. Os valores principais também aparecem sobre os fios.</li>
+    <li>Os fios acendem quando a instrução do estágio os usa: o imediato só para instruções com imediato, a memória de dados só para loads e stores, a escrita só quando há registrador de destino, o caminho do destino do desvio quando ele é tomado.</li>
+    <li>A <strong>unidade de detecção de hazards</strong> acende quando uma instrução fica parada em ID, junto com os seus sinais tracejados (PCWrite, escrita em IF/ID e a bolha no controle); o motivo aparece abaixo do desenho.</li>
+    <li>A <strong>unidade de encaminhamento</strong> lista os encaminhamentos do ciclo, e os fios de EX/MEM ou de MEM/WB até os multiplexadores da ALU acendem em verde. Sem encaminhamento, a unidade aparece desligada e os multiplexadores somem.</li>
+    <li>O menu Exportar salva a figura do ciclo atual em SVG.</li>
 </ul>
 <h3>Hazards e penalidades</h3>
 <table>
