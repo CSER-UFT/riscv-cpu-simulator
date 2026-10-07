@@ -124,18 +124,19 @@ export default {
     <li><strong>Execute</strong>: com todos os operandos disponíveis e uma unidade funcional livre, a operação executa durante a latência da classe.</li>
     <li><strong>Write result</strong>: o resultado é difundido pelo CDB. Cada estação ou registrador que esperava aquela etiqueta recebe o valor, e a estação é liberada.</li>
 </ol>
+<h3>O diagrama</h3>
+<p>A figura segue a estrutura do Hennessy e Patterson: no alto, a <strong>fila de instruções</strong> (a primeira, destacada, é a próxima a ser emitida), o <strong>buffer de reordenação</strong> no modo ROB e o <strong>banco de registradores</strong> com o campo Qi; no meio, o <strong>barramento de operações</strong> e o <strong>barramento de operandos</strong> levando a instrução e os valores às <strong>estações de reserva</strong> de cada grupo; embaixo de cada grupo, a sua <strong>unidade funcional</strong>, com as estações executando e o progresso; e o <strong>CDB</strong>, que acende em verde quando difunde um resultado, voltando para as estações, para os registradores (ou para o ROB) e, no grupo de loads e stores, a ligação com a memória. O desenho cresce conforme os grupos configurados, e o menu Exportar salva a figura do ciclo atual em SVG.</p>
 <h3>Estações de reserva</h3>
 <table>
     <tr><th>Coluna</th><th>Significado</th></tr>
     <tr><td>Busy</td><td>estação ocupada</td></tr>
     <tr><td>Instrução</td><td>a instrução na estação (operação Op)</td></tr>
-    <tr><td>Vj, Vk, Vm</td><td>valores dos operandos já disponíveis; Vm só aparece com instruções de três operandos (<code>fmadd</code> e família). Um Vk em itálico é um imediato.</td></tr>
-    <tr><td>Qj, Qk, Qm</td><td>etiqueta da estação (ou entrada do ROB) que vai produzir o operando que falta</td></tr>
+    <tr><td>Vj / Qj, Vk / Qk, Vm / Qm</td><td>cada operando aparece como valor (V), se já disponível, ou como a etiqueta colorida (Q) da estação ou entrada do ROB que vai produzi-lo; Vm só aparece com instruções de três operandos (<code>fmadd</code> e família). Um Vk em itálico é um imediato.</td></tr>
     <tr><td>A</td><td>nos grupos de memória, o deslocamento e depois o endereço efetivo</td></tr>
     <tr><td>Dest</td><td>no modo ROB, a entrada do ROB da instrução</td></tr>
-    <tr><td>Estado</td><td>aguardando operandos, pronta, executando (com barra de progresso), calculando endereço, acessando a memória, resultado pronto</td></tr>
+    <tr><td>Estado</td><td>aguardando operandos, pronta, executando (com o progresso, como 2/4), calculando endereço, acessando a memória, resultado pronto</td></tr>
 </table>
-<p>As etiquetas têm cores, e a mesma cor marca a estação, os campos Q que a aguardam, o Qi do registrador e o valor no CDB, o que facilita seguir uma dependência. No painel de registradores, a coluna Qi mostra quem vai escrever cada registrador.</p>
+<p>As etiquetas têm cores, e a mesma cor marca a estação, os campos Q que a aguardam, o Qi do registrador e o valor no CDB, o que facilita seguir uma dependência. No banco de registradores, a coluna Qi mostra quem vai escrever cada registrador.</p>
 <h3>Loads e stores</h3>
 <p>Loads e stores calculam o endereço efetivo em ordem de programa (latência de <em>Cálculo de endereço</em>). Um load só lê a memória quando nenhum store anterior ainda pendente escreve em bytes que se sobrepõem aos seus; um store só escreve quando nenhum load ou store anterior pendente acessa os mesmos bytes. A espera aparece no passo como dependência pela memória. Na linha do tempo, o cálculo de endereço aparece como <code>Exec</code> e o acesso como <code>Mem</code>; a escrita do store, como <code>Write</code>. Stores e desvios não usam o CDB.</p>
 <h3>Desvios e saltos</h3>
@@ -162,7 +163,7 @@ export default {
     <li><strong>Write result</strong>: o resultado vai para a entrada do ROB e é difundido pelo CDB para as estações. O banco de registradores ainda não muda.</li>
     <li><strong>Commit</strong>: a entrada da cabeça do ROB, se estiver pronta desde um ciclo anterior, é retirada: o registrador recebe o valor ou o store escreve na memória.</li>
 </ol>
-<h3>O painel do ROB</h3>
+<h3>O ROB no diagrama</h3>
 <p>Cada linha é uma entrada, com os marcadores <em>cabeça</em> (próxima a fazer commit) e <em>cauda</em> (próxima livre). A coluna Estado indica emitida, executando ou pronta; Destino mostra o registrador, o endereço do store ou, nos desvios, a previsão; Valor mostra o resultado ou o resultado do desvio. Linhas com previsão errada aparecem em destaque. Um operando já pronto no ROB é lido diretamente dele na emissão.</p>
 <h3>Preditores de desvio</h3>
 <table>

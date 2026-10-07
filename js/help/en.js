@@ -124,16 +124,17 @@ export default {
     <li><strong>Execute</strong>: with all operands available and a free functional unit, the operation runs for the latency of its class.</li>
     <li><strong>Write result</strong>: the result is broadcast on the CDB. Every station or register waiting for that tag receives the value, and the station is freed.</li>
 </ol>
+<h3>The diagram</h3>
+<p>The figure follows the Hennessy and Patterson structure: at the top, the <strong>instruction queue</strong> (the first one, highlighted, is the next to issue), the <strong>reorder buffer</strong> in ROB mode and the <strong>register file</strong> with the Qi field; in the middle, the <strong>operation bus</strong> and the <strong>operand bus</strong> carrying the instruction and the values to the <strong>reservation stations</strong> of each group; below each group, its <strong>functional unit</strong>, with the stations executing and their progress; and the <strong>CDB</strong>, which lights up in green when it broadcasts a result, going back to the stations, to the registers (or to the ROB) and, in the load and store group, the link to memory. The drawing grows with the configured groups, and the Export menu saves the current cycle figure as SVG.</p>
 <h3>Reservation stations</h3>
 <table>
     <tr><th>Column</th><th>Meaning</th></tr>
     <tr><td>Busy</td><td>station in use</td></tr>
     <tr><td>Instruction</td><td>the instruction in the station (operation Op)</td></tr>
-    <tr><td>Vj, Vk, Vm</td><td>operand values already available; Vm only appears with three operand instructions (<code>fmadd</code> and family). A Vk in italics is an immediate.</td></tr>
-    <tr><td>Qj, Qk, Qm</td><td>tag of the station (or ROB entry) that will produce the missing operand</td></tr>
+    <tr><td>Vj / Qj, Vk / Qk, Vm / Qm</td><td>each operand shows as a value (V), if already available, or as the colored tag (Q) of the station or ROB entry that will produce it; Vm only appears with three operand instructions (<code>fmadd</code> and family). A Vk in italics is an immediate.</td></tr>
     <tr><td>A</td><td>in memory groups, the offset and then the effective address</td></tr>
     <tr><td>Dest</td><td>in ROB mode, the ROB entry of the instruction</td></tr>
-    <tr><td>State</td><td>waiting for operands, ready, executing (with a progress bar), computing address, accessing memory, result ready</td></tr>
+    <tr><td>State</td><td>waiting for operands, ready, executing (with the progress, such as 2/4), computing address, accessing memory, result ready</td></tr>
 </table>
 <p>Tags have colors, and the same color marks the station, the Q fields waiting for it, the Qi of the register and the value on the CDB, which makes dependences easy to follow. In the register panel, the Qi column shows who will write each register.</p>
 <h3>Loads and stores</h3>
@@ -162,7 +163,7 @@ export default {
     <li><strong>Write result</strong>: the result goes to the ROB entry and is broadcast on the CDB to the stations. The register file does not change yet.</li>
     <li><strong>Commit</strong>: the entry at the ROB head, if ready since an earlier cycle, is retired: the register receives the value or the store writes memory.</li>
 </ol>
-<h3>The ROB panel</h3>
+<h3>The ROB in the diagram</h3>
 <p>Each row is an entry, with the <em>head</em> (next to commit) and <em>tail</em> (next free) markers. The State column says issued, executing or ready; Destination shows the register, the store address or, for branches, the prediction; Value shows the result or the branch outcome. Mispredicted rows are highlighted. An operand already ready in the ROB is read directly from it at issue.</p>
 <h3>Branch predictors</h3>
 <table>

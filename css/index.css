@@ -657,41 +657,6 @@ kbd {
     z-index: 1;
 }
 
-#diagram svg.buses {
-    position: absolute;
-    left: 0;
-    top: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: visible;
-}
-
-#diagram svg.buses polyline {
-    fill: none;
-    stroke-width: 2.5;
-    stroke-linejoin: round;
-}
-
-#diagram svg.buses .op {
-    stroke: var(--wire);
-}
-
-#diagram svg.buses .op.active {
-    stroke: var(--ok);
-    stroke-width: 3.5;
-}
-
-#diagram svg.buses .cdb {
-    stroke: var(--wire);
-    stroke-dasharray: 6 4;
-}
-
-#diagram svg.buses .cdb.active {
-    stroke: var(--accent);
-    stroke-width: 4;
-    stroke-dasharray: none;
-}
-
 /* Painéis e tabelas */
 
 .panel {
@@ -1921,4 +1886,79 @@ svg.fig .dot {
 
 svg.fig .dot.on {
     fill: var(--accent);
+}
+
+svg.fig rect.tblbox {
+    fill: var(--panel);
+    stroke: var(--line-strong);
+}
+
+svg.fig rect.tblbox.focus {
+    stroke: var(--focus);
+    stroke-width: 3;
+}
+
+svg.fig rect.rowbg {
+    stroke: none;
+}
+
+svg.fig rect.rowbg.focus {
+    fill: var(--focus-soft);
+    stroke: var(--focus);
+    stroke-width: 1.5;
+}
+
+svg.fig line.sep {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+svg.fig rect.tag {
+    stroke-width: 1.2;
+}
+
+svg.fig text.imm {
+    font-style: italic;
+}
+
+svg.fig path.fu {
+    fill: color-mix(in srgb, var(--bg) 60%, var(--panel));
+    stroke: var(--line-strong);
+    stroke-width: 1.5;
+}
+
+svg.fig path.fu.on {
+    fill: var(--accent-soft);
+    stroke: var(--accent);
+}
+
+svg.fig rect.membox {
+    fill: var(--c-mem);
+    stroke: var(--line-strong);
+}
+
+svg.fig rect.membox.on {
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+
+svg.fig rect.membox.focus {
+    stroke: var(--focus);
+    stroke-width: 3;
+}
+
+svg.fig .wire.bus {
+    stroke-width: 4;
+}
+
+svg.fig .wire.cdb.on {
+    stroke: var(--ok);
+}
+
+svg.fig .head.cdb.on {
+    fill: var(--ok);
+}
+
+svg.fig g.focus > .wire.bus {
+    stroke: var(--focus);
 }
