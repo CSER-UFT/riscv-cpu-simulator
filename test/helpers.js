@@ -123,7 +123,9 @@ export const CONFIGS = {
 /** Compara o estado final do Tomasulo com o simulador de referência. */
 export function assertMatchesReference(program, config, label = '') {
     const ref = runReference(program, { exampleValues: config.exampleValues ?? true });
-    const sim = simulate(program, { maxCycles: 20000, ...config });
+    // Sem instantâneos (trace) por padrão: a comparação só usa o estado final, e os instantâneos de cada passo
+    // são a parte mais cara da simulação.
+    const sim = simulate(program, { maxCycles: 20000, trace: false, ...config });
     assert.deepEqual(sim.errors, [], `${label}: erros de configuração`);
     assert.ok(sim.finished, `${label}: a simulação não terminou (${sim.warnings.join(' ')})`);
     for (let i = 0; i < 32; i++) {

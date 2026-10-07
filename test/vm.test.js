@@ -89,7 +89,7 @@ test('pipeline: as faltas de página e as caminhadas custam ciclos, e o resultad
     };
     const plain = simulate(asm(src), { mode: 'pipeline', memory });
     const vm = { enabled: true, pageSize: 128, tlbEntries: 2, tlbAssoc: 2, frames: 16, faultLatency: 40, preload: false };
-    const virt = assertMatchesReference(asm(src), { mode: 'pipeline', memory: { ...memory, vm } }, 'pipeline');
+    const virt = assertMatchesReference(asm(src), { mode: 'pipeline', memory: { ...memory, vm }, trace: true }, 'pipeline');
     const v = virt.stats.memory.vm;
     assert.equal(v.faults, 8, 'uma falta por página tocada');
     assert.equal(v.tlbMisses, 8);

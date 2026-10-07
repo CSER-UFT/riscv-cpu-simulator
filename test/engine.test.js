@@ -388,7 +388,7 @@ test('pipeline: falha na cache prolonga o estágio MEM', () => {
 });
 
 test('monociclo: CPI igual a 1', () => {
-    const sim = assertMatchesReference(asm(EXAMPLES.find((e) => e.id === 'loop').code), { mode: 'single' }, 'monociclo');
+    const sim = assertMatchesReference(asm(EXAMPLES.find((e) => e.id === 'loop').code), { mode: 'single', trace: true }, 'monociclo');
     assert.equal(sim.stats.cycles, sim.stats.instructions);
     for (let c = 1; c < sim.states.length; c++)
         assert.ok(sim.interStates[c].length >= 3, 'cada ciclo é explicado em passos');
