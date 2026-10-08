@@ -104,6 +104,19 @@ function isSymbolName(tok) {
  * @param {string} source código assembly
  * @param {{xlen?: number}} options
  */
+/**
+ * Mensagem didática para uma instrução que só existe no RV64: explica o motivo (registradores de 64 bits) e,
+ * quando há, sugere a instrução equivalente do RV32.
+ */
+export function rv64Message(name) {
+    const fp = { ld: 'fld', sd: 'fsd' }[name];
+    let alt = { ld: 'lw', sd: 'sw', lwu: 'lw' }[name] ?? null;
+    if (!alt && /^fcvt\.[a-z]+\.lu?$|^fcvt\.lu?\./.test(name)) alt = name.replace(/\.l(u?)(?=\.|$)/, '.w$1');
+    else if (!alt && /w$/.test(name)) alt = name.slice(0, -1);
+    const hint = !alt ? '' : fp ? t('asm.rv64AltFp', { alt, fp }) : t('asm.rv64Alt', { alt });
+    return t('asm.needRv64', { name, hint });
+}
+
 export function assemble(source, { xlen = 32 } = {}) {
     const errors = [];
     const symbols = new Map();
@@ -470,7 +483,7 @@ export function assemble(source, { xlen = 32 } = {}) {
     function buildInstruction(name, ops, ipc) {
         const d = lookup(name);
         if (!d) fail(t('asm.unknownInstruction', { name }));
-        if (d.rv64 && xlen !== 64) fail(t('asm.needRv64', { name }));
+        if (d.rv64 && xlen !== 64) fail(rv64Message(name));
 
         const inst = { name, def: d, pc: ipc, rd: null, rs1: null, rs2: null, rs3: null, imm: 0, target: null, rm: null };
         const opsText = [];

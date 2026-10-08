@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assemble, DATA_BASE } from '../js/riscv/parser.js';
+import { assemble, DATA_BASE, rv64Message } from '../js/riscv/parser.js';
 import { readRaw } from '../js/riscv/memory.js';
 import { asm } from './helpers.js';
 
@@ -143,4 +143,14 @@ test('comentários de código não são confundidos com valores iniciais', () =>
     assert.equal(p.init.x.has('x5'), false);
     assert.equal(p.init.x.has('x7'), false);
     assert.equal(assemble('# a0 = 1x2\nnop').errors.length, 1, 'número malformado em linha só de comentário ainda é erro');
+});
+
+test('instrução só do RV64 no RV32: mensagem explica e sugere a equivalente', () => {
+    const r = assemble('ld t0, 0(sp)\naddiw t1, t1, 1', { xlen: 32 });
+    assert.equal(r.errors.length, 2);
+    assert.match(r.errors[0].message, /64 bits.*lw.*fld/);
+    assert.match(rv64Message('addiw'), /use addi\./);
+    assert.match(rv64Message('fcvt.l.s'), /fcvt\.w\.s/);
+    assert.doesNotMatch(rv64Message('fmv.x.d'), /No RV32, use/);
+    assert.equal(assemble('ld t0, 0(sp)', { xlen: 64 }).errors.length, 0);
 });
