@@ -58,7 +58,7 @@ O botão **Ajuda** abre um manual completo, com índice e busca: primeiros passo
 
 Clique em **Nova Simulação**, escolha um exemplo ou escreva o programa, ajuste a configuração e clique em **Executar** (ou `Ctrl` + `Enter`). Cada simulação abre em uma aba.
 
-* `Seta direita` e `Seta esquerda`, ou os botões internos: avança ou volta um passo (com ou sem `Ctrl`, como o clique nos botões); com `Shift`, um ciclo.
+* `Seta direita` e `Seta esquerda`, ou os botões internos: avança ou volta um passo; com `Ctrl`, um ciclo.
 * `Home` e `End`, ou os botões das extremidades: início e fim da execução.
 * Arrastar, roda do mouse e duplo clique: mover, ampliar e restaurar o diagrama.
 

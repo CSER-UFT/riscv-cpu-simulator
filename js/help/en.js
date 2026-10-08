@@ -49,10 +49,10 @@ export default {
 <p>Each cycle is split into <strong>steps</strong>, one for each relevant event (an issue, a CDB broadcast, a cache hit...). Moving one step shows the next event; moving one cycle jumps to the end of the next cycle.</p>
 <table>
     <tr><th>Action</th><th>Keyboard</th><th>Button</th></tr>
-    <tr><td>One step forward</td><td><kbd>→</kbd> or <kbd>Ctrl</kbd> + <kbd>→</kbd></td><td>button right after the counter</td></tr>
-    <tr><td>One step back</td><td><kbd>←</kbd> or <kbd>Ctrl</kbd> + <kbd>←</kbd></td><td>button right before the counter</td></tr>
-    <tr><td>One cycle forward</td><td><kbd>Shift</kbd> + <kbd>→</kbd></td><td>the same button, with <kbd>Shift</kbd> or <kbd>Ctrl</kbd></td></tr>
-    <tr><td>One cycle back</td><td><kbd>Shift</kbd> + <kbd>←</kbd></td><td>the same button, with <kbd>Shift</kbd> or <kbd>Ctrl</kbd></td></tr>
+    <tr><td>One step forward</td><td><kbd>→</kbd></td><td>button right after the counter</td></tr>
+    <tr><td>One step back</td><td><kbd>←</kbd></td><td>button right before the counter</td></tr>
+    <tr><td>One cycle forward</td><td><kbd>Ctrl</kbd> + <kbd>→</kbd></td><td>the same button, with <kbd>Ctrl</kbd></td></tr>
+    <tr><td>One cycle back</td><td><kbd>Ctrl</kbd> + <kbd>←</kbd></td><td>the same button, with <kbd>Ctrl</kbd></td></tr>
     <tr><td>Go to start</td><td><kbd>Home</kbd></td><td>first button</td></tr>
     <tr><td>Go to end</td><td><kbd>End</kbd></td><td>last button</td></tr>
     <tr><td>Run (in the editor)</td><td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td><td>Run</td></tr>
