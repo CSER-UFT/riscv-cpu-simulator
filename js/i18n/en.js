@@ -239,6 +239,8 @@ export default {
     'ui.initialState': 'Initial state. Move forward with the right arrow.',
     'ui.finished': 'End of execution: {n} instructions in {cycles} cycles (IPC {ipc}).',
     'ui.endOfCycle': 'End of cycle {n}.',
+    'ui.cycleSummary': 'End of cycle {n}. In this cycle:',
+    'ui.cycleEmpty': 'End of cycle {n}: nothing new happened; the instructions in flight stay where they were.',
     'ui.registers': 'Registers',
     'ui.value': 'Value',
     'ui.memory': 'Memory',
