@@ -4,6 +4,7 @@
 import { renderTomasulo } from './diagram-tomasulo.js';
 import { renderPipeline } from './diagram-pipeline.js';
 import { renderSingle } from './diagram-single.js';
+import { renderDual } from './diagram-dual.js';
 
 export { createContext } from './panels.js';
 
@@ -12,6 +13,7 @@ export function render(el, ctx, snap) {
     switch (ctx.sim.model) {
         case 'single': return renderSingle(el, ctx, snap);
         case 'pipeline': return renderPipeline(el, ctx, snap);
+        case 'dual': return renderDual(el, ctx, snap);
         default: return renderTomasulo(el, ctx, snap);
     }
 }

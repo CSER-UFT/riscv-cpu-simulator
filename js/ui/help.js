@@ -8,7 +8,7 @@ import { getLanguage } from '../i18n/index.js';
 const CONTENT = { pt, en };
 
 /** Seção da ajuda correspondente a cada modelo de processador. */
-export const MODEL_SECTION = { single: 'single', pipeline: 'pipeline', classic: 'tomasulo', rob: 'rob' };
+export const MODEL_SECTION = { single: 'single', pipeline: 'pipeline', dual: 'dual', classic: 'tomasulo', rob: 'rob' };
 
 const normalize = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 

@@ -33,6 +33,20 @@ export const CONFIGS = {
             },
         },
     },
+    'dual issue com encaminhamento': { mode: 'dual', predictor: '2bit' },
+    'dual issue sem encaminhamento, desvio em ID': { mode: 'dual', predictor: 'taken', pipeline: { forwarding: false, branchStage: 'ID' } },
+    'dual issue, desvio em ID, latências e cache': {
+        mode: 'dual', predictor: 'btfn', pipeline: { forwarding: true, branchStage: 'ID' },
+        latency: { mul: 3, div: 6, fadd: 2, fmul: 3, fdiv: 5 },
+        memory: {
+            enabled: true, mainLatency: 9,
+            levels: {
+                L1I: { enabled: true, size: 32, blockSize: 8, assoc: 1, latency: 1 },
+                L1D: { enabled: true, size: 32, blockSize: 8, assoc: 2, latency: 2 },
+                L2: { enabled: false }, L3: { enabled: false },
+            },
+        },
+    },
     'clássico padrão': { mode: 'classic' },
     'clássico mínimo': {
         mode: 'classic',

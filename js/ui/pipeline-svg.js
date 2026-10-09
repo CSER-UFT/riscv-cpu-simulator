@@ -26,7 +26,7 @@ const NO_IMM = new Set(['R', 'R2', 'R4', 'SYS']);
 const rn = (r) => (abiName(r) && abiName(r) !== r ? `${r} (${abiName(r)})` : r);
 
 /** Linhas de informação de um estágio (rótulo, valor), como no painel de cada estágio. */
-function stageInfo(ctx, snap, stage, s) {
+export function stageInfo(ctx, snap, stage, s) {
     const inst = ctx.sim.program.instructions[s.index];
     const out = [];
     const ops = [['rs1', inst.rs1, s.a], ['rs2', inst.rs2, s.b], ['rs3', inst.rs3, s.c]].filter(([, r]) => r);

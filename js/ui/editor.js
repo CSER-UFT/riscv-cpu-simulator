@@ -301,8 +301,8 @@ export class Editor {
         const show = {
             'tom-only': tom,
             'rob-only': mode === 'rob',
-            'pipe-only': mode === 'pipeline',
-            'spec-only': mode === 'rob' || mode === 'pipeline',
+            'pipe-only': mode === 'pipeline' || mode === 'dual',
+            'spec-only': mode === 'rob' || mode === 'pipeline' || mode === 'dual',
             'not-single': mode !== 'single',
         };
         for (const [cls, visible] of Object.entries(show))

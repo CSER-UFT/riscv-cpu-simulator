@@ -5,7 +5,7 @@
  *   monociclo: o caminho da instrução mais lenta do conjunto de instruções, pois o hardware precisa
  *     suportar todas elas em um único ciclo; a etapa de execução de uma classe com latência L (em ciclos
  *     de estágio) custa L vezes o atraso da ALU;
- *   pipeline: o estágio mais lento mais a sobrecarga do registrador de pipeline;
+ *   pipeline (com emissão simples ou dupla): o estágio mais lento mais a sobrecarga do registrador de pipeline;
  *   Tomasulo: como o pipeline, mais uma sobrecarga opcional da lógica de escalonamento.
  * Alternativamente, o período pode vir de uma frequência digitada.
  */
@@ -48,7 +48,7 @@ export function clockPeriod(cfg) {
     } else {
         const stages = ['imem', 'regRead', 'alu', 'dmem', 'regWrite'];
         const slowest = stages.reduce((a, b) => (d[b] > d[a] ? b : a));
-        const extra = cfg.mode === 'pipeline' ? 0 : d.scheduler;
+        const extra = cfg.mode === 'pipeline' || cfg.mode === 'dual' ? 0 : d.scheduler;
         periodPs = d[slowest] + d.latch + extra;
         critical = { kind: 'stage', stage: slowest, parts: [[slowest, 1, d[slowest]], ['latch', 1, d.latch], ...(extra ? [['scheduler', 1, extra]] : [])] };
     }

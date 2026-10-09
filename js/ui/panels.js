@@ -193,7 +193,12 @@ export function statsRows(sim) {
         rows.push([t('stats.time'), `${fmtNum(sim.timing.timeNs, 2)} ns`]);
     }
     const add = (key, v) => { if (v !== undefined) rows.push([t(key), v]); };
-    if (sim.model === 'pipeline') {
+    if (sim.model === 'dual') {
+        add('stats.packets', s.packets);
+        add('stats.dualPackets', s.dualPackets);
+        add('stats.emptySlots', s.emptySlots);
+    }
+    if (sim.model === 'pipeline' || sim.model === 'dual') {
         add('stats.branches', s.branches);
         add('stats.mispredicts', s.mispredicts);
         add('stats.flushed', s.flushed);

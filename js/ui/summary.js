@@ -8,7 +8,7 @@ import { clockPeriod } from '../core/timing.js';
 export function configSummary(cfg) {
     const items = [t(`mode.${cfg.mode}`), `RV${cfg.xlen}`];
     const lat = (keys) => keys.map((k) => `${className(k)}: ${cfg.latency[k]}`).join(', ');
-    if (cfg.mode === 'pipeline') {
+    if (cfg.mode === 'pipeline' || cfg.mode === 'dual') {
         items.push(t(cfg.pipeline.forwarding ? 'ui.pipe.fwdOn' : 'ui.pipe.fwdOff'));
         items.push(t('ui.pipe.branchAt', { stage: cfg.pipeline.branchStage }));
         items.push(t(`predictor.${cfg.predictor}`));

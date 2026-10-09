@@ -18,7 +18,7 @@ export default {
 <ol>
     <li>Clique em <strong>Nova simulação</strong>.</li>
     <li>Escolha um <strong>exemplo</strong> na lista ou escreva o seu programa no editor. Os erros aparecem abaixo do editor, com o número da linha; clique em um erro para ir até a linha.</li>
-    <li>À direita, escolha o <strong>modelo</strong> (monociclo, pipeline, Tomasulo clássico ou Tomasulo com ROB) e ajuste a configuração, se quiser. Os campos mudam conforme o modelo.</li>
+    <li>À direita, escolha o <strong>modelo</strong> (monociclo, pipeline, pipeline com emissão dupla, Tomasulo clássico ou Tomasulo com ROB) e ajuste a configuração, se quiser. Os campos mudam conforme o modelo.</li>
     <li>Clique em <strong>Executar</strong> (ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd>). A simulação abre em uma aba nova.</li>
     <li>Avance com a <kbd>seta para a direita</kbd>. Cada passo mostra uma frase explicando o que aconteceu, e o diagrama destaca a parte do processador envolvida.</li>
 </ol>
@@ -112,6 +112,34 @@ export default {
 <p>O preditor é consultado no IF, e o destino do desvio é considerado conhecido já na busca. Os preditores disponíveis estão descritos em <a href="#h-rob">Tomasulo com ROB</a>. O <code>ecall</code> encerra a busca quando chega ao ID.</p>
 <h3>Linha do tempo</h3>
 <p>As células mostram o estágio em que a instrução está: <code>IF</code>, <code>ID</code>, <code>EX</code>, <code>MEM</code>, <code>WB</code>, <code>Parada</code> (a instrução ficou no mesmo estágio) ou <code>Descartada</code>.</p>`,
+        },
+        {
+            id: 'dual',
+            title: 'Pipeline com emissão dupla estática',
+            html: `
+<p>O processador da seção 4.10 do Patterson e Hennessy: o mesmo pipeline de 5 estágios, mas a cada ciclo entra um <strong>pacote de emissão</strong> com duas instruções. O <strong>slot 0</strong> recebe uma instrução de ALU ou de desvio (também multiplicação, divisão e ponto flutuante) e o <strong>slot 1</strong> recebe um load ou um store. Sem paradas, o processador conclui duas instruções por ciclo (IPC 2, CPI 0,5).</p>
+<h3>Como o pacote é formado</h3>
+<p>É uma emissão <em>estática</em>: quem decide o que vai junto é a ordem do código, como faria o compilador. A partir do PC, a próxima instrução ocupa o slot do seu tipo, e a seguinte entra no outro slot se:</p>
+<ul>
+    <li>for do tipo complementar (uma de ALU ou desvio e a outra load ou store, em qualquer ordem);</li>
+    <li>não ler o registrador que a primeira escreve (as duas leem os registradores no mesmo ciclo) nem escrever no mesmo registrador;</li>
+    <li>a primeira não for um desvio ou salto (a instrução seguinte pode estar em outro caminho). Um desvio pode ir no slot 0 junto com o load ou store que o precede, como no exemplo do livro.</li>
+</ul>
+<p>Caso contrário, o slot vazio leva um <code>nop</code>, e a mensagem do IF explica o motivo. Duas instruções que só têm antidependência (a segunda escreve um registrador que a primeira lê) podem ir juntas, porque a primeira lê o valor antigo no mesmo ciclo.</p>
+<h3>O que muda em relação ao pipeline simples</h3>
+<ul>
+    <li>A memória de instruções entrega duas instruções por ciclo e o PC avança 8 (a não ser que o pacote tenha uma só).</li>
+    <li>O banco de registradores tem <strong>4 portas de leitura e 2 de escrita</strong>, e há dois geradores de imediato.</li>
+    <li>O slot 1 tem um <strong>somador próprio</strong> para o endereço; só ele acessa a memória de dados.</li>
+    <li>O encaminhamento vem da ALU (EX/MEM e MEM/WB) e do dado lido (MEM/WB), para os operandos dos dois slots.</li>
+    <li>O pacote avança inteiro: se uma das instruções precisa esperar (dependência, operação de várias etapas, falha na cache), as duas esperam.</li>
+    <li>O custo das paradas dobra: o load seguido de uso ainda custa 1 ciclo, mas agora são <strong>dois slots</strong> perdidos.</li>
+</ul>
+<h3>Escalonamento e desenrolamento de laços</h3>
+<p>Os exemplos <em>Dual issue: o laço do livro</em> e <em>Dual issue: laço desenrolado 4 vezes</em> reproduzem as figuras da seção 4.10. O laço simples, já reordenado, faz 5 instruções em 4 ciclos por iteração (IPC 1,25). Desenrolado 4 vezes, com registradores diferentes para cada cópia, faz 14 instruções em 8 ciclos (IPC 1,75). Troque a ordem das instruções e veja como os pacotes e as paradas mudam; compare também com o modelo <em>Pipeline de 5 estágios</em> no botão Comparar.</p>
+<h3>O diagrama e a linha do tempo</h3>
+<p>No alto de cada estágio aparecem as duas instruções do pacote: a linha de cima é o slot 0 e a de baixo o slot 1 (<em>nop</em> quando o slot está vazio, tracejadas quando o pacote está parado). As estatísticas mostram os pacotes emitidos, quantos tiveram duas instruções e quantos slots ficaram vazios. Na linha do tempo, as duas instruções do pacote aparecem nos mesmos ciclos.</p>
+<p>Simplificações: o pacote é formado na busca a partir do PC atual (não há alinhamento de 64 bits nem pacotes fixos no código), e um desvio para o meio de um par simplesmente forma novos pacotes a partir dali. As opções de encaminhamento, estágio do desvio, previsor, latências e hierarquia de memória são as mesmas do pipeline simples.</p>`,
         },
         {
             id: 'tomasulo',
@@ -299,7 +327,7 @@ export default {
 <h3>Processador</h3>
 <table>
     <tr><th>Campo</th><th>Modelos</th><th>Significado</th></tr>
-    <tr><td>Modelo</td><td>todos</td><td>monociclo, pipeline, Tomasulo clássico ou Tomasulo com ROB</td></tr>
+    <tr><td>Modelo</td><td>todos</td><td>monociclo, pipeline, pipeline com emissão dupla, Tomasulo clássico ou Tomasulo com ROB</td></tr>
     <tr><td>XLEN</td><td>todos</td><td>RV32 ou RV64; instruções como <code>ld</code>, <code>sd</code> e <code>addw</code> exigem RV64</td></tr>
     <tr><td>Encaminhamento</td><td>pipeline</td><td>liga as ligações EX/MEM e MEM/WB para a entrada do EX</td></tr>
     <tr><td>Desvios resolvidos em</td><td>pipeline</td><td>EX ou ID</td></tr>

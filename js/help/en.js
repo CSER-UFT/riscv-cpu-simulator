@@ -18,7 +18,7 @@ export default {
 <ol>
     <li>Click <strong>New simulation</strong>.</li>
     <li>Pick an <strong>example</strong> from the list or write your own program in the editor. Errors are listed below the editor with their line numbers; click an error to jump to its line.</li>
-    <li>On the right, choose the <strong>model</strong> (single cycle, pipeline, classic Tomasulo or Tomasulo with ROB) and adjust the configuration if you want. The fields change with the model.</li>
+    <li>On the right, choose the <strong>model</strong> (single cycle, pipeline, dual issue pipeline, classic Tomasulo or Tomasulo with ROB) and adjust the configuration if you want. The fields change with the model.</li>
     <li>Click <strong>Run</strong> (or <kbd>Ctrl</kbd> + <kbd>Enter</kbd>). The simulation opens in a new tab.</li>
     <li>Move forward with the <kbd>right arrow</kbd>. Each step shows a sentence explaining what happened, and the diagram highlights the part of the processor involved.</li>
 </ol>
@@ -112,6 +112,34 @@ export default {
 <p>The predictor is consulted in IF, and the branch target is assumed known at fetch. The available predictors are described in <a href="#h-rob">Tomasulo with ROB</a>. <code>ecall</code> stops fetching when it reaches ID.</p>
 <h3>Timeline</h3>
 <p>Cells show the stage of the instruction: <code>IF</code>, <code>ID</code>, <code>EX</code>, <code>MEM</code>, <code>WB</code>, <code>Stall</code> (the instruction stayed in the same stage) or <code>Squashed</code>.</p>`,
+        },
+        {
+            id: 'dual',
+            title: 'Static dual issue pipeline',
+            html: `
+<p>The processor of section 4.10 of Patterson and Hennessy: the same 5 stage pipeline, but every cycle an <strong>issue packet</strong> with two instructions enters. <strong>Slot 0</strong> takes an ALU or branch instruction (also multiply, divide and floating point) and <strong>slot 1</strong> takes a load or a store. Without stalls, the processor completes two instructions per cycle (IPC 2, CPI 0.5).</p>
+<h3>How the packet is formed</h3>
+<p>Issue is <em>static</em>: the order of the code decides what goes together, as a compiler would. From the PC, the next instruction takes the slot of its type, and the following one enters the other slot if:</p>
+<ul>
+    <li>it is of the complementary type (one ALU or branch and the other load or store, in either order);</li>
+    <li>it does not read the register the first one writes (both read registers in the same cycle) nor write the same register;</li>
+    <li>the first one is not a branch or jump (the next instruction may be on another path). A branch can go in slot 0 together with the load or store that precedes it, as in the textbook example.</li>
+</ul>
+<p>Otherwise the empty slot gets a <code>nop</code>, and the IF message explains why. Two instructions with only an antidependence (the second writes a register the first reads) can go together, because the first reads the old value in the same cycle.</p>
+<h3>What changes from the single issue pipeline</h3>
+<ul>
+    <li>The instruction memory delivers two instructions per cycle and the PC advances by 8 (unless the packet has only one).</li>
+    <li>The register file has <strong>4 read ports and 2 write ports</strong>, and there are two immediate generators.</li>
+    <li>Slot 1 has its <strong>own adder</strong> for the address; only it accesses data memory.</li>
+    <li>Forwarding comes from the ALU (EX/MEM and MEM/WB) and from the loaded data (MEM/WB), to the operands of both slots.</li>
+    <li>The packet advances as a whole: if one instruction has to wait (dependence, multicycle operation, cache miss), both wait.</li>
+    <li>Stalls cost twice as much: a load followed by a use still costs 1 cycle, but now <strong>two slots</strong> are lost.</li>
+</ul>
+<h3>Scheduling and loop unrolling</h3>
+<p>The examples <em>Dual issue: the textbook loop</em> and <em>Dual issue: loop unrolled 4 times</em> reproduce the figures of section 4.10. The simple loop, already reordered, runs 5 instructions in 4 cycles per iteration (IPC 1.25). Unrolled 4 times, with different registers for each copy, it runs 14 instructions in 8 cycles (IPC 1.75). Change the order of the instructions and watch how the packets and stalls change; also compare with the <em>5 stage pipeline</em> model using the Compare button.</p>
+<h3>The diagram and the timeline</h3>
+<p>At the top of each stage you see the two instructions of the packet: the upper row is slot 0 and the lower row slot 1 (<em>nop</em> when the slot is empty, dashed when the packet is stalled). The statistics show the issued packets, how many had two instructions and how many slots stayed empty. In the timeline, both instructions of a packet appear in the same cycles.</p>
+<p>Simplifications: the packet is formed at fetch from the current PC (there is no 64 bit alignment nor fixed packets in the code), and a branch into the middle of a pair simply forms new packets from there. The forwarding, branch stage, predictor, latency and memory hierarchy options are the same as in the single issue pipeline.</p>`,
         },
         {
             id: 'tomasulo',
@@ -299,7 +327,7 @@ export default {
 <h3>Processor</h3>
 <table>
     <tr><th>Field</th><th>Models</th><th>Meaning</th></tr>
-    <tr><td>Model</td><td>all</td><td>single cycle, pipeline, classic Tomasulo or Tomasulo with ROB</td></tr>
+    <tr><td>Model</td><td>all</td><td>single cycle, pipeline, dual issue pipeline, classic Tomasulo or Tomasulo with ROB</td></tr>
     <tr><td>XLEN</td><td>all</td><td>RV32 or RV64; instructions such as <code>ld</code>, <code>sd</code> and <code>addw</code> need RV64</td></tr>
     <tr><td>Forwarding</td><td>pipeline</td><td>enables the EX/MEM and MEM/WB paths to the EX input</td></tr>
     <tr><td>Branches resolved in</td><td>pipeline</td><td>EX or ID</td></tr>

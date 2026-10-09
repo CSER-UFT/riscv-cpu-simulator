@@ -8,7 +8,7 @@ import { t } from '../i18n/index.js';
 export function eventColumns(sim) {
     switch (sim.model) {
         case 'single': return [{ key: 'cycle', label: t('ev.cycle') }];
-        case 'pipeline': return ['IF', 'ID', 'EX', 'MEM', 'WB'].map((k) => ({ key: k, label: k }));
+        case 'pipeline': case 'dual': return ['IF', 'ID', 'EX', 'MEM', 'WB'].map((k) => ({ key: k, label: k }));
         default: {
             const cols = [
                 { key: 'issue', label: 'Issue' },
@@ -31,7 +31,7 @@ export function eventRows(sim) {
         const values = {};
         if (sim.model === 'single') {
             values.cycle = first('Exec');
-        } else if (sim.model === 'pipeline') {
+        } else if (sim.model === 'pipeline' || sim.model === 'dual') {
             for (const k of ['IF', 'ID', 'EX', 'MEM', 'WB']) values[k] = first(k);
         } else {
             const exec = d.marks.filter((m) => m[1] === 'Exec' || m[1] === 'Mem').map((m) => m[0]);

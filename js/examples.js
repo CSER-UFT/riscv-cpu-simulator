@@ -175,6 +175,62 @@ fim:
 `,
     },
     {
+        id: 'dual',
+        name: 'Dual issue: o laço do livro',
+        nameEn: 'Dual issue: the textbook loop',
+        config: { mode: 'dual', xlen: 64, predictor: '2bit' },
+        code: `# Laço da seção 4.10 do Patterson e Hennessy: soma x21 a cada elemento do vetor,
+# do último para o primeiro. O slot 0 recebe ALU ou desvio; o slot 1, load ou store.
+# A ordem abaixo já está escalonada como no livro: 5 instruções em 4 ciclos por iteração.
+# x21 = 10
+.data
+v:  .dword 1, 2, 3, 4, 5, 6, 7, 8
+.text
+    la    x22, v
+    addi  x20, x22, 56    # x20: último elemento
+    addi  x22, x22, -8    # o laço para quando x20 passa do primeiro
+Loop:
+    ld    x31, 0(x20)     # junto com o addi no mesmo pacote
+    addi  x20, x20, -8    # lê x20 no mesmo ciclo: o ld usa o valor antigo
+    add   x31, x31, x21   # espera o load (um ciclo de parada para o pacote)
+    sd    x31, 8(x20)     # deslocamento corrigido pelo addi
+    blt   x22, x20, Loop  # forma um pacote com o sd
+`,
+    },
+    {
+        id: 'dual-unroll',
+        name: 'Dual issue: laço desenrolado 4 vezes',
+        nameEn: 'Dual issue: loop unrolled 4 times',
+        config: { mode: 'dual', xlen: 64, predictor: '2bit' },
+        code: `# O mesmo laço desenrolado 4 vezes e escalonado como na figura do livro: 14 instruções
+# em 8 pacotes por iteração. Os registradores x28 a x31 evitam dependências falsas
+# (renomeação feita pelo compilador), e a ordem faz cada pacote sair como na figura:
+# o load não fica no pacote logo antes do seu uso. Compare o IPC com o exemplo anterior.
+# x21 = 10
+.data
+v:  .dword 1, 2, 3, 4, 5, 6, 7, 8
+.text
+    la    x22, v
+    addi  x20, x22, 56
+    addi  x22, x22, -8
+Loop:
+    ld    x28, 0(x20)
+    addi  x20, x20, -32   # pacote 1: ld | addi (o ld lê o x20 antigo)
+    ld    x29, 24(x20)    # pacote 2: ld sozinho (a seguinte também é load)
+    ld    x30, 16(x20)
+    add   x28, x28, x21   # pacote 3: ld | add
+    ld    x31, 8(x20)
+    add   x29, x29, x21   # pacote 4
+    sd    x28, 32(x20)
+    add   x30, x30, x21   # pacote 5
+    sd    x29, 24(x20)
+    add   x31, x31, x21   # pacote 6
+    sd    x30, 16(x20)    # pacote 7: sd sozinho
+    sd    x31, 8(x20)
+    blt   x22, x20, Loop  # pacote 8: sd | blt
+`,
+    },
+    {
         id: 'single',
         name: 'Monociclo: tipos de instrução',
         nameEn: 'Single cycle: instruction types',

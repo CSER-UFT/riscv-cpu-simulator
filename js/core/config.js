@@ -5,7 +5,7 @@ import { CLASSES } from '../riscv/isa.js';
 import { t } from '../i18n/index.js';
 
 /** Modelos de processador, na ordem de exibição. */
-export const MODE_IDS = ['single', 'pipeline', 'classic', 'rob'];
+export const MODE_IDS = ['single', 'pipeline', 'dual', 'classic', 'rob'];
 export const PREDICTOR_IDS = ['not-taken', 'taken', 'btfn', '1bit', '2bit'];
 export const LATENCY_IDS = ['address', 'load', 'store', 'alu', 'branch', 'jump', 'mul', 'div', 'fadd', 'fmul', 'fdiv'];
 

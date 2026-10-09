@@ -4,7 +4,7 @@
 
 Simulador didático de processadores RISC-V, do monociclo ao escalonamento dinâmico pelo [algoritmo de Tomasulo](https://pt.wikipedia.org/wiki/Algoritmo_de_Tomasulo), desenvolvido para o curso de **Ciência da Computação** da **Universidade Federal do Tocantins**.
 
-Começou como um simulador do algoritmo de Tomasulo (por isso os nomes anteriores do repositório, `riscv-simulator-tomasulo` e `riscv-simulator`) e hoje cobre monociclo, pipeline, Tomasulo com e sem ROB, hierarquia de memória e memória virtual.
+Começou como um simulador do algoritmo de Tomasulo (por isso os nomes anteriores do repositório, `riscv-simulator-tomasulo` e `riscv-simulator`) e hoje cobre monociclo, pipeline com emissão simples ou dupla, Tomasulo com e sem ROB, hierarquia de memória e memória virtual.
 
 O simulador roda inteiramente no navegador (HTML e JavaScript, sem dependências nem etapa de compilação) e pode ser publicado diretamente no GitHub Pages. A interface está em português e em inglês, com tema claro e tema escuro (botão de contraste no cabeçalho; na primeira visita segue a preferência do sistema).
 
@@ -12,6 +12,7 @@ O simulador roda inteiramente no navegador (HTML e JavaScript, sem dependências
 
 * **Monociclo**: cada instrução em um ciclo, com o caminho de dados desenhado e os blocos, ligações, valores e sinais de controle destacados a cada passo (busca, decodificação, execução, memória, escrita e atualização do PC).
 * **Pipeline de 5 estágios** (IF, ID, EX, MEM, WB): encaminhamento opcional (EX/MEM e MEM/WB), detecção de hazards com bolhas, desvios resolvidos em EX ou em ID, previsão de desvios, operações de várias etapas no EX (multiplicação, divisão, ponto flutuante) e hierarquia de memória no IF e no MEM. O diagrama é o caminho de dados com pipeline do Patterson e Hennessy, com os registradores de pipeline, as unidades de detecção de hazards e de encaminhamento, a instrução de cada estágio no alto e os fios acesos conforme o uso, o encaminhamento e as paradas.
+* **Pipeline com emissão dupla estática** (seção 4.10 do Patterson e Hennessy): a cada ciclo entra um pacote com duas instruções, uma de ALU ou desvio no slot 0 e um load ou store no slot 1, formado em ordem pelo código (o slot vazio vira nop, com o motivo explicado); banco de registradores com 4 leituras e 2 escritas, somador de endereço próprio no slot 1, encaminhamento entre os slots e o pacote parando inteiro. Os exemplos reproduzem o laço do livro (IPC 1,25) e o laço desenrolado 4 vezes (IPC 1,75), com um diagrama próprio de dois slots e as mesmas opções do pipeline.
 * **Tomasulo clássico**: estações de reserva, renomeação pelo nome da estação e difusão pelo CDB; sem especulação.
 * **Tomasulo com ROB**: buffer de reordenação, commit em ordem, especulação com previsão de desvios e correção da previsão errada no commit ou já na resolução do desvio.
 
@@ -36,7 +37,7 @@ Como o ciclo do monociclo executa uma instrução inteira e o do pipeline e do T
 * **Passo a passo**: cada ciclo é dividido em passos com uma explicação do que acontece, e a linha do tempo mostra o estágio de cada instrução em cada ciclo.
 * **Exercício**: o aluno preenche, para cada instrução, o ciclo de cada evento (Issue, início e fim da execução, Write e Commit no Tomasulo; IF, ID, EX, MEM e WB no pipeline) e o simulador corrige. O link copiado de um exercício abre diretamente nele.
 * **Comparar**: executa o mesmo programa com outra configuração e mostra o speedup pelo tempo de execução, decomposto em CPI e período do clock, além das estatísticas, das diferenças de configuração e das duas linhas do tempo lado a lado.
-* **Exportar**: linha do tempo e tabela de eventos em CSV e em LaTeX, inclusive a tabela em branco para provas e listas. As tabelas LaTeX usam cabeçalho com fundo `tabAzul` e texto branco, `\hline` e não usam booktabs. A figura do ciclo atual (monociclo, pipeline ou Tomasulo) é salva em SVG, com as cores do tema claro, para slides e documentos.
+* **Exportar**: linha do tempo e tabela de eventos em CSV e em LaTeX, inclusive a tabela em branco para provas e listas. As tabelas LaTeX usam cabeçalho com fundo `tabAzul` e texto branco, `\hline` e não usam booktabs. A figura do ciclo atual (monociclo, pipeline, dual issue ou Tomasulo) é salva em SVG, com as cores do tema claro, para slides e documentos.
 * **Copiar link**: gera um endereço que abre a mesma simulação, comparação ou exercício.
 
 ## Linguagem aceita
